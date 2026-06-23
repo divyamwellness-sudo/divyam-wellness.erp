@@ -28,6 +28,10 @@ export type ProductCategory =
   | 'accessories'
   | 'other';
 
+export type InvoiceStatus = 'created' | 'partial' | 'paid' | 'cancelled';
+
+export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'card';
+
 /**
  * Maps a pricing tier to the product price column that holds its price.
  * Single source of truth shared by the catalog UI and the future Billing module.
@@ -319,6 +323,182 @@ export type Database = {
           },
         ];
       };
+      invoices: {
+        Row: {
+          id: string;
+          invoice_number: string;
+          customer_id: string;
+          customer_type: CustomerType;
+          pricing_tier: PricingTier;
+          subtotal: number;
+          total_vp: number;
+          tax_amount: number;
+          total_amount: number;
+          paid_amount: number;
+          due_amount: number;
+          status: InvoiceStatus;
+          invoice_date: string;
+          due_date: string;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_number?: string;
+          customer_id: string;
+          customer_type: CustomerType;
+          pricing_tier: PricingTier;
+          subtotal?: number;
+          total_vp?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          paid_amount?: number;
+          due_amount?: number;
+          status?: InvoiceStatus;
+          invoice_date?: string;
+          due_date?: string;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_number?: string;
+          customer_id?: string;
+          customer_type?: CustomerType;
+          pricing_tier?: PricingTier;
+          subtotal?: number;
+          total_vp?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          paid_amount?: number;
+          due_amount?: number;
+          status?: InvoiceStatus;
+          invoice_date?: string;
+          due_date?: string;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoices_customer_id_fkey';
+            columns: ['customer_id'];
+            referencedRelation: 'customers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoices_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      invoice_items: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          product_id: string | null;
+          product_name: string;
+          product_sku: string;
+          unit_price: number;
+          unit_vp: number;
+          quantity: number;
+          line_total: number;
+          line_vp: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          product_id?: string | null;
+          product_name: string;
+          product_sku: string;
+          unit_price: number;
+          unit_vp?: number;
+          quantity: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          product_id?: string | null;
+          product_name?: string;
+          product_sku?: string;
+          unit_price?: number;
+          unit_vp?: number;
+          quantity?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoice_items_invoice_id_fkey';
+            columns: ['invoice_id'];
+            referencedRelation: 'invoices';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoice_items_product_id_fkey';
+            columns: ['product_id'];
+            referencedRelation: 'products';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      payments: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          amount: number;
+          payment_method: PaymentMethod;
+          payment_date: string;
+          reference_num: string | null;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          amount: number;
+          payment_method: PaymentMethod;
+          payment_date?: string;
+          reference_num?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          amount?: number;
+          payment_method?: PaymentMethod;
+          payment_date?: string;
+          reference_num?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'payments_invoice_id_fkey';
+            columns: ['invoice_id'];
+            referencedRelation: 'invoices';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payments_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -341,6 +521,18 @@ export type WeightLogUpdate = Database['public']['Tables']['weight_logs']['Updat
 export type Product = Database['public']['Tables']['products']['Row'];
 export type ProductInsert = Database['public']['Tables']['products']['Insert'];
 export type ProductUpdate = Database['public']['Tables']['products']['Update'];
+
+export type Invoice = Database['public']['Tables']['invoices']['Row'];
+export type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
+export type InvoiceUpdate = Database['public']['Tables']['invoices']['Update'];
+
+export type InvoiceItem = Database['public']['Tables']['invoice_items']['Row'];
+export type InvoiceItemInsert = Database['public']['Tables']['invoice_items']['Insert'];
+export type InvoiceItemUpdate = Database['public']['Tables']['invoice_items']['Update'];
+
+export type Payment = Database['public']['Tables']['payments']['Row'];
+export type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
+export type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
 
 /** Resolves the price of a product for a given pricing tier. */
 export function resolveProductPrice(product: Product, tier: PricingTier): number {
