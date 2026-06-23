@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Plus,
@@ -207,6 +208,8 @@ function InvoiceTable({
 }
 
 export function InvoicesPage() {
+  const navigate = useNavigate();
+
   const [filters, setFilters] = useState<InvoiceFilters>({
     status: 'all',
     customerId: '',
@@ -276,7 +279,7 @@ export function InvoicesPage() {
   };
 
   const handleCreateInvoice = () => {
-    showToast('Invoice creation form is coming soon.');
+    navigate('/billing/invoices/new');
   };
 
   const handleViewInvoice = (invoice: Invoice) => {

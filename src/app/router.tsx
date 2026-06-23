@@ -6,6 +6,8 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { CustomersPage } from '@/features/customers/pages/CustomersPage';
 import { WeightTrackingPage } from '@/features/weight-tracking/pages/WeightTrackingPage';
 import { ProductsPage } from '@/features/products/pages/ProductsPage';
+import { InvoicesPage } from '@/features/billing/pages/InvoicesPage';
+import { CreateInvoicePage } from '@/features/billing/pages/CreateInvoicePage';
 import { ProtectedRoute, PublicOnlyRoute } from '@/hooks/useProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -52,13 +54,15 @@ export const router = createBrowserRouter([
           },
           {
             path: 'billing',
-            element: (
-              <PlaceholderPage
-                title="Billing"
-                description="Create invoices with automatic tier-based pricing."
-                phase="Phase 4 — Billing Module"
-              />
-            ),
+            element: <Navigate to="/billing/invoices" replace />,
+          },
+          {
+            path: 'billing/invoices',
+            element: <InvoicesPage />,
+          },
+          {
+            path: 'billing/invoices/new',
+            element: <CreateInvoicePage />,
           },
           {
             path: 'reports',
