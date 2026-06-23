@@ -3,6 +3,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
+import { CustomersPage } from '@/features/customers/pages/CustomersPage';
+import { WeightTrackingPage } from '@/features/weight-tracking/pages/WeightTrackingPage';
 import { ProtectedRoute, PublicOnlyRoute } from '@/hooks/useProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -27,23 +29,11 @@ export const router = createBrowserRouter([
           },
           {
             path: 'customers',
-            element: (
-              <PlaceholderPage
-                title="Customers"
-                description="Manage customer profiles, wellness goals, and pricing tiers."
-                phase="Phase 2 — Customers Module"
-              />
-            ),
+            element: <CustomersPage />,
           },
           {
             path: 'weight-tracking',
-            element: (
-              <PlaceholderPage
-                title="Weight Tracking"
-                description="Log and monitor customer weight progress over time."
-                phase="Phase 2 — Weight Tracking Module"
-              />
-            ),
+            element: <WeightTrackingPage />,
           },
           {
             path: 'products',

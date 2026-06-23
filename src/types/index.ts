@@ -1,1 +1,15 @@
-export type { Database, Profile, BusinessSettings } from './database.types';
+export type {
+  Database,
+  Profile,
+  BusinessSettings,
+  Customer,
+  CustomerInsert,
+  CustomerUpdate,
+  WeightLog,
+  WeightLogInsert,
+  WeightLogUpdate,
+  Gender,
+  CustomerGoal,
+  PricingTier,
+  CustomerStatus,
+} from './database.types';
