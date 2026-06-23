@@ -7,9 +7,44 @@ export type CustomerGoal =
   | 'muscle_gain'
   | 'general_wellness';
 
-export type PricingTier = 'MRP' | '25' | '35' | '42' | '50';
+export type CustomerType = 'pc' | 'coach';
+
+export type PricingTier = 'MRP' | '15' | '25' | '35' | '42' | '50';
 
 export type CustomerStatus = 'active' | 'inactive';
+
+export const TIERS_BY_CUSTOMER_TYPE: Record<CustomerType, PricingTier[]> = {
+  pc: ['MRP', '15', '25', '35'],
+  coach: ['MRP', '25', '35', '42', '50'],
+};
+
+export type ProductCategory =
+  | 'shakes'
+  | 'protein'
+  | 'tea_energy'
+  | 'supplements'
+  | 'vitamins'
+  | 'skincare'
+  | 'accessories'
+  | 'other';
+
+/**
+ * Maps a pricing tier to the product price column that holds its price.
+ * Single source of truth shared by the catalog UI and the future Billing module.
+ * Because price is keyed by tier value alone, PC and Coach automatically share
+ * the price for tiers 25 and 35.
+ */
+export const PRICE_FIELD_BY_TIER: Record<
+  PricingTier,
+  'mrp_price' | 'price_15' | 'price_25' | 'price_35' | 'price_42' | 'price_50'
+> = {
+  MRP: 'mrp_price',
+  '15': 'price_15',
+  '25': 'price_25',
+  '35': 'price_35',
+  '42': 'price_42',
+  '50': 'price_50',
+};
 
 export type Database = {
   public: {
@@ -94,6 +129,7 @@ export type Database = {
           current_weight: number | null;
           target_weight: number | null;
           goal: CustomerGoal | null;
+          customer_type: CustomerType;
           pricing_tier: PricingTier;
           notes: string | null;
           status: CustomerStatus;
@@ -117,6 +153,7 @@ export type Database = {
           current_weight?: number | null;
           target_weight?: number | null;
           goal?: CustomerGoal | null;
+          customer_type?: CustomerType;
           pricing_tier?: PricingTier;
           notes?: string | null;
           status?: CustomerStatus;
@@ -140,6 +177,7 @@ export type Database = {
           current_weight?: number | null;
           target_weight?: number | null;
           goal?: CustomerGoal | null;
+          customer_type?: CustomerType;
           pricing_tier?: PricingTier;
           notes?: string | null;
           status?: CustomerStatus;
@@ -220,6 +258,67 @@ export type Database = {
           },
         ];
       };
+      products: {
+        Row: {
+          id: string;
+          name: string;
+          sku: string;
+          category: ProductCategory;
+          mrp_price: number;
+          price_15: number;
+          price_25: number;
+          price_35: number;
+          price_42: number;
+          price_50: number;
+          volume_points: number;
+          is_active: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          sku: string;
+          category?: ProductCategory;
+          mrp_price: number;
+          price_15?: number;
+          price_25?: number;
+          price_35?: number;
+          price_42?: number;
+          price_50?: number;
+          volume_points?: number;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          sku?: string;
+          category?: ProductCategory;
+          mrp_price?: number;
+          price_15?: number;
+          price_25?: number;
+          price_35?: number;
+          price_42?: number;
+          price_50?: number;
+          volume_points?: number;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'products_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -238,3 +337,12 @@ export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
 export type WeightLog = Database['public']['Tables']['weight_logs']['Row'];
 export type WeightLogInsert = Database['public']['Tables']['weight_logs']['Insert'];
 export type WeightLogUpdate = Database['public']['Tables']['weight_logs']['Update'];
+
+export type Product = Database['public']['Tables']['products']['Row'];
+export type ProductInsert = Database['public']['Tables']['products']['Insert'];
+export type ProductUpdate = Database['public']['Tables']['products']['Update'];
+
+/** Resolves the price of a product for a given pricing tier. */
+export function resolveProductPrice(product: Product, tier: PricingTier): number {
+  return product[PRICE_FIELD_BY_TIER[tier]];
+}

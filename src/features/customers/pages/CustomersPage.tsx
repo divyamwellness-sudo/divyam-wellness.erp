@@ -14,7 +14,7 @@ import {
   searchCustomers,
   type CustomerFilters,
 } from '@/features/customers/services/customer.service';
-import type { Customer, CustomerInsert, CustomerUpdate, PricingTier, CustomerStatus } from '@/types';
+import type { Customer, CustomerInsert, CustomerUpdate, CustomerType, PricingTier, CustomerStatus } from '@/types';
 
 type CustomerFormMode = 'create' | 'edit' | null;
 
@@ -24,18 +24,38 @@ const statusOptions = [
   { value: 'inactive', label: 'Inactive Only' },
 ];
 
+const customerTypeOptions = [
+  { value: '', label: 'All Types' },
+  { value: 'pc', label: 'PC' },
+  { value: 'coach', label: 'Coach' },
+];
+
 const pricingTierOptions = [
   { value: '', label: 'All Tiers' },
   { value: 'MRP', label: 'MRP' },
-  { value: '25', label: 'Tier 25' },
-  { value: '35', label: 'Tier 35' },
-  { value: '42', label: 'Tier 42' },
-  { value: '50', label: 'Tier 50' },
+  { value: '15', label: '15%' },
+  { value: '25', label: '25%' },
+  { value: '35', label: '35%' },
+  { value: '42', label: '42%' },
+  { value: '50', label: '50%' },
 ];
 
+function CustomerTypeBadge({ type }: { type: CustomerType }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+        type === 'coach' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700'
+      }`}
+    >
+      {type === 'coach' ? 'Coach' : 'PC'}
+    </span>
+  );
+}
+
 function PricingTierBadge({ tier }: { tier: PricingTier }) {
-  const colorMap = {
+  const colorMap: Record<PricingTier, string> = {
     MRP: 'bg-purple-100 text-purple-700',
+    '15': 'bg-sky-100 text-sky-700',
     '25': 'bg-blue-100 text-blue-700',
     '35': 'bg-green-100 text-green-700',
     '42': 'bg-orange-100 text-orange-700',
@@ -44,7 +64,7 @@ function PricingTierBadge({ tier }: { tier: PricingTier }) {
 
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${colorMap[tier]}`}>
-      {tier === 'MRP' ? 'MRP' : `Tier ${tier}`}
+      {tier === 'MRP' ? 'MRP' : `${tier}%`}
     </span>
   );
 }
@@ -129,6 +149,9 @@ function CustomerTable({
                 Age
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                Type
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                 Tier
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -169,6 +192,9 @@ function CustomerTable({
                       <p className="text-slate-400">—</p>
                     )}
                   </div>
+                </td>
+                <td className="px-6 py-4">
+                  <CustomerTypeBadge type={customer.customer_type} />
                 </td>
                 <td className="px-6 py-4">
                   <PricingTierBadge tier={customer.pricing_tier} />
@@ -228,6 +254,7 @@ export function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<CustomerFilters>({
     status: 'active',
+    customerType: '',
     pricingTier: '',
   });
 
@@ -348,15 +375,18 @@ export function CustomersPage() {
 
       {/* Filters and Search */}
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        <div className="grid gap-4 md:grid-cols-5">
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-700">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
 
           <Select
@@ -364,6 +394,13 @@ export function CustomersPage() {
             value={filters.status || 'all'}
             onChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}
             options={statusOptions}
+          />
+
+          <Select
+            label="Customer Type"
+            value={filters.customerType || ''}
+            onChange={(value) => handleFilterChange('customerType', value)}
+            options={customerTypeOptions}
           />
 
           <Select
@@ -379,7 +416,7 @@ export function CustomersPage() {
               className="w-full"
               onClick={() => {
                 setSearchTerm('');
-                setFilters({ status: 'active', pricingTier: '' });
+                setFilters({ status: 'active', customerType: '', pricingTier: '' });
               }}
             >
               <Filter className="h-4 w-4" />

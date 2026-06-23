@@ -3,6 +3,7 @@ import type { Customer, CustomerInsert, CustomerUpdate } from '@/types';
 
 export type CustomerFilters = {
   status?: 'active' | 'inactive' | 'all';
+  customerType?: string;
   pricingTier?: string;
   city?: string;
 };
@@ -72,6 +73,10 @@ export async function getCustomers(filters: CustomerFilters = {}): Promise<Custo
     // Apply filters
     if (filters.status && filters.status !== 'all') {
       query = query.eq('status', filters.status);
+    }
+
+    if (filters.customerType) {
+      query = query.eq('customer_type', filters.customerType);
     }
 
     if (filters.pricingTier) {

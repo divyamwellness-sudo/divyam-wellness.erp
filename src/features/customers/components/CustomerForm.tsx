@@ -1,29 +1,43 @@
+import { useEffect } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { calculateAge } from '@/lib/utils/format';
-import type { Customer, CustomerInsert, CustomerUpdate, Gender, CustomerGoal, PricingTier } from '@/types';
+import { TIERS_BY_CUSTOMER_TYPE } from '@/types';
+import type { Customer, CustomerInsert, CustomerUpdate, Gender, CustomerGoal, CustomerType, PricingTier } from '@/types';
 
-const customerFormSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').trim(),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits').regex(/^\d+$/, 'Phone number must contain only digits'),
-  whatsapp_number: z.string().optional().refine((val) => !val || (val.length >= 10 && /^\d+$/.test(val)), {
-    message: 'WhatsApp number must be at least 10 digits and contain only digits',
-  }),
-  email: z.string().email('Invalid email address').optional().or(z.literal('')),
-  gender: z.enum(['male', 'female', 'other'] as const).optional(),
-  date_of_birth: z.string().optional(),
-  city: z.string().optional(),
-  joining_date: z.string().min(1, 'Joining date is required'),
-  height_cm: z.number().min(50, 'Height must be at least 50 cm').max(250, 'Height must be at most 250 cm').optional(),
-  starting_weight: z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
-  target_weight: z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
-  goal: z.enum(['weight_loss', 'weight_gain', 'maintenance', 'muscle_gain', 'general_wellness'] as const).optional(),
-  pricing_tier: z.enum(['MRP', '25', '35', '42', '50'] as const),
-  notes: z.string().optional(),
-});
+const customerFormSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters').trim(),
+    phone: z.string().min(10, 'Phone number must be at least 10 digits').regex(/^\d+$/, 'Phone number must contain only digits'),
+    whatsapp_number: z.string().optional().refine((val) => !val || (val.length >= 10 && /^\d+$/.test(val)), {
+      message: 'WhatsApp number must be at least 10 digits and contain only digits',
+    }),
+    email: z.string().email('Invalid email address').optional().or(z.literal('')),
+    gender: z.enum(['male', 'female', 'other'] as const).optional(),
+    date_of_birth: z.string().optional(),
+    city: z.string().optional(),
+    joining_date: z.string().min(1, 'Joining date is required'),
+    height_cm: z.number().min(50, 'Height must be at least 50 cm').max(250, 'Height must be at most 250 cm').optional(),
+    starting_weight: z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
+    target_weight: z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
+    goal: z.enum(['weight_loss', 'weight_gain', 'maintenance', 'muscle_gain', 'general_wellness'] as const).optional(),
+    customer_type: z.enum(['pc', 'coach'] as const),
+    pricing_tier: z.enum(['MRP', '15', '25', '35', '42', '50'] as const),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const validTiers = TIERS_BY_CUSTOMER_TYPE[data.customer_type];
+    if (!validTiers.includes(data.pricing_tier)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['pricing_tier'],
+        message: `Tier ${data.pricing_tier} is not valid for a ${data.customer_type === 'pc' ? 'PC' : 'Coach'} customer`,
+      });
+    }
+  });
 
 type CustomerFormData = z.infer<typeof customerFormSchema>;
 
@@ -49,13 +63,14 @@ const goalOptions: Array<{ value: CustomerGoal; label: string }> = [
   { value: 'general_wellness', label: 'General Wellness' },
 ];
 
-const pricingTierOptions: Array<{ value: PricingTier; label: string }> = [
-  { value: 'MRP', label: 'MRP' },
-  { value: '25', label: '25%' },
-  { value: '35', label: '35%' },
-  { value: '42', label: '42%' },
-  { value: '50', label: '50%' },
+const customerTypeOptions: Array<{ value: CustomerType; label: string }> = [
+  { value: 'pc', label: 'PC (Preferred Customer)' },
+  { value: 'coach', label: 'Coach (Distributor)' },
 ];
+
+function tierLabel(tier: PricingTier): string {
+  return tier === 'MRP' ? 'MRP' : `${tier}%`;
+}
 
 function formatDateForInput(dateString?: string | null): string {
   if (!dateString) return new Date().toISOString().split('T')[0];
@@ -134,6 +149,7 @@ export function CustomerForm({ mode, customer, onSubmit, isLoading = false, onCa
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerFormSchema),
@@ -150,13 +166,28 @@ export function CustomerForm({ mode, customer, onSubmit, isLoading = false, onCa
       starting_weight: customer?.starting_weight || undefined,
       target_weight: customer?.target_weight || undefined,
       goal: customer?.goal || undefined,
-      pricing_tier: customer?.pricing_tier || '35',
+      customer_type: customer?.customer_type || 'pc',
+      pricing_tier: customer?.pricing_tier || 'MRP',
       notes: customer?.notes || '',
     },
   });
 
   const dateOfBirth = watch('date_of_birth');
   const age = calculateAge(dateOfBirth);
+
+  const customerType = watch('customer_type');
+  const pricingTier = watch('pricing_tier');
+  const tierOptions = TIERS_BY_CUSTOMER_TYPE[customerType].map((tier) => ({
+    value: tier,
+    label: tierLabel(tier),
+  }));
+
+  // When the membership type changes, reset the tier if it is no longer valid.
+  useEffect(() => {
+    if (!TIERS_BY_CUSTOMER_TYPE[customerType].includes(pricingTier)) {
+      setValue('pricing_tier', 'MRP', { shouldValidate: true });
+    }
+  }, [customerType, pricingTier, setValue]);
 
   const onFormSubmit: SubmitHandler<CustomerFormData> = async (data) => {
     const processedData = {
@@ -252,9 +283,17 @@ export function CustomerForm({ mode, customer, onSubmit, isLoading = false, onCa
           />
 
           <Select
+            label="Customer Type *"
+            name="customer_type"
+            options={customerTypeOptions}
+            register={register}
+            error={errors.customer_type?.message}
+          />
+
+          <Select
             label="Pricing Tier *"
             name="pricing_tier"
-            options={pricingTierOptions}
+            options={tierOptions}
             register={register}
             error={errors.pricing_tier?.message}
           />

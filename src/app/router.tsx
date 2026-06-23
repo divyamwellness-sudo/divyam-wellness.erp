@@ -5,6 +5,7 @@ import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { CustomersPage } from '@/features/customers/pages/CustomersPage';
 import { WeightTrackingPage } from '@/features/weight-tracking/pages/WeightTrackingPage';
+import { ProductsPage } from '@/features/products/pages/ProductsPage';
 import { ProtectedRoute, PublicOnlyRoute } from '@/hooks/useProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -37,13 +38,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'products',
-            element: (
-              <PlaceholderPage
-                title="Products"
-                description="Manage Herbalife products with VP, GST, MRP, and tier pricing."
-                phase="Phase 3 — Products Module"
-              />
-            ),
+            element: <ProductsPage />,
           },
           {
             path: 'inventory',
