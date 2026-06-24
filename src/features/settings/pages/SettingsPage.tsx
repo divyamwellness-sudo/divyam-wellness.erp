@@ -12,6 +12,7 @@ import {
   updateBusinessSettings,
   type UpdateBusinessSettingsRequest,
 } from '@/features/settings/services/settings.service';
+import { BusinessLogoUpload } from '@/features/settings/components/BusinessLogoUpload';
 
 const currencyOptions = [{ value: 'INR', label: 'INR (₹)' }] as const;
 
@@ -180,6 +181,8 @@ export function SettingsPage() {
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">Business Settings</h2>
           <div className="grid gap-4 md:grid-cols-2">
+            <BusinessLogoUpload settingsId={settings.id} logoUrl={settings.logo_url} />
+
             <Input
               label="Business Name *"
               {...register('business_name')}

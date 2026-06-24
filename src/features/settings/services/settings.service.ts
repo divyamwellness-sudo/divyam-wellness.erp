@@ -1,5 +1,10 @@
 import { supabase } from '@/lib/supabase/client';
 import type { BusinessSettings, BusinessSettingsUpdate } from '@/types/database.types';
+import {
+  BUSINESS_LOGO_BUCKET,
+  getBusinessLogoStoragePath,
+  validateBusinessLogoFile,
+} from '@/features/settings/utils/businessLogo';
 
 export type UpdateBusinessSettingsRequest = Omit<
   BusinessSettingsUpdate,
@@ -83,5 +88,55 @@ export async function updateBusinessSettings(
       throw error;
     }
     handleSupabaseError(error, 'updateBusinessSettings');
+  }
+}
+
+export async function uploadBusinessLogo(
+  settingsId: string,
+  file: File,
+): Promise<BusinessSettings> {
+  const validation = validateBusinessLogoFile(file);
+  if (!validation.valid) {
+    throw new SettingsServiceError(validation.message, 'VALIDATION');
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? 'png';
+  const storagePath = getBusinessLogoStoragePath(extension);
+  const contentType =
+    file.type ||
+    (extension === 'png'
+      ? 'image/png'
+      : extension === 'webp'
+        ? 'image/webp'
+        : 'image/jpeg');
+
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from(BUSINESS_LOGO_BUCKET)
+      .upload(storagePath, file, {
+        upsert: true,
+        contentType,
+        cacheControl: '3600',
+      });
+
+    if (uploadError) {
+      throw new SettingsServiceError(
+        `Failed to upload logo: ${uploadError.message}`,
+        uploadError.name,
+      );
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(BUSINESS_LOGO_BUCKET)
+      .getPublicUrl(storagePath);
+
+    const logoUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+
+    return updateBusinessSettings(settingsId, { logo_url: logoUrl });
+  } catch (error) {
+    if (error instanceof SettingsServiceError) {
+      throw error;
+    }
+    handleSupabaseError(error, 'uploadBusinessLogo');
   }
 }

@@ -2,8 +2,6 @@ import { forwardRef } from 'react';
 import { formatDate } from '@/lib/utils/format';
 import { formatCurrency, formatVP } from '@/lib/utils/currency';
 import {
-  formatCustomerType,
-  formatPricingTier,
   invoiceStatusLabels,
   paymentMethodLabels,
   sortInvoicePayments,
@@ -24,14 +22,23 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
     const due = Number(invoice.due_amount);
     const showDueHighlight = due > 0 && invoice.status !== 'cancelled';
     const customer = invoice.customer;
+    const showVp = invoice.customer_type === 'coach';
 
     return (
       <div ref={ref} className="invoice-document">
         <header className="invoice-document__header">
           <div className="invoice-document__brand">
-            <div className="invoice-document__logo-placeholder" aria-label="Business logo placeholder">
-              Logo
-            </div>
+            {businessSettings.logo_url ? (
+              <img
+                src={businessSettings.logo_url}
+                alt={`${businessSettings.business_name} logo`}
+                className="invoice-document__logo"
+              />
+            ) : (
+              <div className="invoice-document__logo-placeholder" aria-label="Business logo placeholder">
+                Logo
+              </div>
+            )}
             <div>
               <h1 className="invoice-document__business-name">{businessSettings.business_name}</h1>
               {businessSettings.address && (
@@ -71,38 +78,12 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           <h3 className="invoice-document__section-title">Bill To</h3>
           <div className="invoice-document__grid">
             <div>
-              <span className="invoice-document__field-label">Name</span>
+              <span className="invoice-document__field-label">Customer Name</span>
               <p className="invoice-document__field-value">{customer?.name ?? '—'}</p>
             </div>
             <div>
-              <span className="invoice-document__field-label">Phone</span>
+              <span className="invoice-document__field-label">Phone Number</span>
               <p className="invoice-document__field-value">{customer?.phone ?? '—'}</p>
-            </div>
-            {customer?.email && (
-              <div>
-                <span className="invoice-document__field-label">Email</span>
-                <p className="invoice-document__field-value">{customer.email}</p>
-              </div>
-            )}
-            {customer?.city && (
-              <div>
-                <span className="invoice-document__field-label">City</span>
-                <p className="invoice-document__field-value">{customer.city}</p>
-              </div>
-            )}
-            {customer?.address && (
-              <div>
-                <span className="invoice-document__field-label">Address</span>
-                <p className="invoice-document__field-value">{customer.address}</p>
-              </div>
-            )}
-            <div>
-              <span className="invoice-document__field-label">Customer Type</span>
-              <p className="invoice-document__field-value">{formatCustomerType(invoice.customer_type)}</p>
-            </div>
-            <div>
-              <span className="invoice-document__field-label">Pricing Tier</span>
-              <p className="invoice-document__field-value">{formatPricingTier(invoice.pricing_tier)}</p>
             </div>
           </div>
         </section>
@@ -119,7 +100,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                   <th className="text-right">Qty</th>
                   <th className="text-right">Unit Price</th>
                   <th className="text-right">Line Total</th>
-                  <th className="text-right">VP</th>
+                  {showVp ? <th className="text-right">VP</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -132,9 +113,11 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                     <td className="text-right">{item.quantity}</td>
                     <td className="text-right">{formatCurrency(Number(item.unit_price))}</td>
                     <td className="text-right">{formatCurrency(Number(item.line_total))}</td>
-                    <td className="text-right invoice-document__vp">
-                      {formatVP(Number(item.line_vp))}
-                    </td>
+                    {showVp ? (
+                      <td className="text-right invoice-document__vp">
+                        {formatVP(Number(item.line_vp))}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -155,12 +138,14 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               {formatCurrency(Number(invoice.tax_amount))}
             </span>
           </div>
-          <div className="invoice-document__totals-row">
-            <span className="invoice-document__totals-label">Total VP</span>
-            <span className="invoice-document__totals-value invoice-document__vp">
-              {formatVP(Number(invoice.total_vp))}
-            </span>
-          </div>
+          {showVp ? (
+            <div className="invoice-document__totals-row">
+              <span className="invoice-document__totals-label">Total VP</span>
+              <span className="invoice-document__totals-value invoice-document__vp">
+                {formatVP(Number(invoice.total_vp))}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="invoice-document__payment-summary">

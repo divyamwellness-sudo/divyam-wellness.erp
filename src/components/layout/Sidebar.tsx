@@ -21,10 +21,18 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       )}
     >
-      <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white">
-          <Leaf className="h-5 w-5" />
-        </div>
+          <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
+        {businessSettings?.logo_url ? (
+          <img
+            src={businessSettings.logo_url}
+            alt=""
+            className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-0.5"
+          />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white">
+            <Leaf className="h-5 w-5" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-900">
             {businessSettings?.business_name ?? ''}

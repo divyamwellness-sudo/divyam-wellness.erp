@@ -1,15 +1,35 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Scale, TrendingDown, TrendingUp, Calendar, CalendarClock, Activity } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  Calendar,
+  CalendarClock,
+  Download,
+  Printer,
+  Scale,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
-import { calculateAge } from '@/lib/utils/format';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { ProgressLineChart } from '@/features/customers/components/ProgressLineChart';
+import { ProgressReportDocument } from '@/features/customers/components/ProgressReportDocument';
 import { getCustomerById } from '@/features/customers/services/customer.service';
 import { buildProgressAnalytics } from '@/features/customers/utils/progressAnalytics';
+import {
+  formatBmiChange,
+  formatWeightChange,
+  getProgressReportPdfFilename,
+} from '@/features/customers/utils/progressReportDocument';
+import { downloadProgressReportPdf } from '@/features/customers/utils/progressReportPdf';
+import { useProgressReportPrint } from '@/features/customers/utils/progressReportPrint';
+import { getBusinessSettings } from '@/features/settings/services/settings.service';
 import { getWeightLogs } from '@/features/weight-tracking/services/weight-log.service';
+import { calculateAge } from '@/lib/utils/format';
 import type { CustomerType, PricingTier } from '@/types/database.types';
 
 const chartColors: Record<string, string> = {
@@ -69,6 +89,10 @@ function SummaryCard({
 export function CustomerDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { businessSettings: authBusinessSettings } = useAuth();
+  const documentRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [documentActionError, setDocumentActionError] = useState<string | null>(null);
 
   const {
     data: customer,
@@ -92,10 +116,59 @@ export function CustomerDetailsPage() {
     enabled: !!id,
   });
 
+  const { data: fetchedBusinessSettings } = useQuery({
+    queryKey: ['businessSettings'],
+    queryFn: getBusinessSettings,
+    enabled: !authBusinessSettings,
+  });
+
+  const businessSettings = authBusinessSettings ?? fetchedBusinessSettings ?? null;
+
   const analytics = useMemo(() => {
     if (!customer || weightLogsError || !weightLogs) return null;
     return buildProgressAnalytics(weightLogs, customer);
   }, [customer, weightLogs, weightLogsError]);
+
+  const logs = weightLogs ?? [];
+  const canExportReport = Boolean(
+    customer && analytics && logs.length > 0 && businessSettings,
+  );
+
+  const handlePrint = useProgressReportPrint(
+    documentRef,
+    customer ? `${customer.name} Progress Report` : 'Progress Report',
+  );
+
+  const handlePrintClick = () => {
+    if (!canExportReport) {
+      setDocumentActionError('Configure business settings before printing.');
+      return;
+    }
+
+    setDocumentActionError(null);
+    handlePrint();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!documentRef.current || !customer) {
+      setDocumentActionError('Progress report is not ready.');
+      return;
+    }
+
+    setDocumentActionError(null);
+    setIsGeneratingPdf(true);
+
+    try {
+      await downloadProgressReportPdf(
+        documentRef.current,
+        getProgressReportPdfFilename(customer.name),
+      );
+    } catch {
+      setDocumentActionError('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   if (isLoadingCustomer) {
     return (
@@ -131,7 +204,6 @@ export function CustomerDetailsPage() {
   }
 
   const summary = analytics?.summary;
-  const logs = weightLogs ?? [];
   const age = calculateAge(customer.date_of_birth);
 
   const weightChange = summary?.weightChange ?? null;
@@ -141,13 +213,8 @@ export function CustomerDetailsPage() {
   const bmiChange = summary?.bmiChange ?? null;
   const isBmiImprovement = bmiChange != null && bmiChange < 0;
 
-  const weightChangeLabel =
-    weightChange == null
-      ? '—'
-      : `${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} kg`;
-
-  const bmiChangeLabel =
-    bmiChange == null ? '—' : `${bmiChange > 0 ? '+' : ''}${bmiChange.toFixed(1)}`;
+  const weightChangeLabel = formatWeightChange(weightChange);
+  const bmiChangeLabel = formatBmiChange(bmiChange);
 
   return (
     <div>
@@ -155,11 +222,31 @@ export function CustomerDetailsPage() {
         title={customer.name}
         description="Customer profile and wellness progress analytics."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => navigate('/customers')}>
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
+            {logs.length > 0 && (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={handlePrintClick}
+                  disabled={!canExportReport}
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Progress Report
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => void handleDownloadPdf()}
+                  disabled={!canExportReport || isGeneratingPdf}
+                >
+                  <Download className="h-4 w-4" />
+                  {isGeneratingPdf ? 'Generating PDF…' : 'Download PDF'}
+                </Button>
+              </>
+            )}
             <Button variant="secondary" onClick={() => navigate('/weight-tracking')}>
               <Scale className="h-4 w-4" />
               Log Weight
@@ -204,6 +291,12 @@ export function CustomerDetailsPage() {
           </div>
         </div>
       </div>
+
+      {documentActionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {documentActionError}
+        </div>
+      )}
 
       {weightLogsError && (
         <QueryErrorAlert
@@ -299,6 +392,18 @@ export function CustomerDetailsPage() {
           </div>
         </>
       ) : null}
+
+      {canExportReport && analytics && businessSettings && (
+        <div className="fixed left-[-9999px] top-0 -z-50 overflow-hidden" aria-hidden="true">
+          <ProgressReportDocument
+            ref={documentRef}
+            customer={customer}
+            analytics={analytics}
+            weightLogs={logs}
+            businessSettings={businessSettings}
+          />
+        </div>
+      )}
     </div>
   );
 }

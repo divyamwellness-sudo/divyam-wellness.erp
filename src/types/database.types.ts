@@ -86,6 +86,7 @@ export type Database = {
           email: string | null;
           address: string | null;
           gstin: string | null;
+          logo_url: string | null;
           invoice_prefix: string;
           next_invoice_number: number;
           currency: string;
@@ -99,6 +100,7 @@ export type Database = {
           email?: string | null;
           address?: string | null;
           gstin?: string | null;
+          logo_url?: string | null;
           invoice_prefix?: string;
           next_invoice_number?: number;
           currency?: string;
@@ -112,6 +114,7 @@ export type Database = {
           email?: string | null;
           address?: string | null;
           gstin?: string | null;
+          logo_url?: string | null;
           invoice_prefix?: string;
           next_invoice_number?: number;
           currency?: string;
