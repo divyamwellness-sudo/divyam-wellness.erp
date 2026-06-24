@@ -1,6 +1,7 @@
 import { useForm, useFieldArray, Controller, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Scale, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +10,8 @@ import { getCustomers } from '@/features/customers/services/customer.service';
 import { getProducts } from '@/features/products/services/product.service';
 import { getInvoices, type CreateInvoiceRequest } from '@/features/billing/services/invoice.service';
 import { ProductSearchCombobox } from '@/features/billing/components/ProductSearchCombobox';
+import { LocationSelect } from '@/features/inventory/components/LocationSelect';
+import { getStockLocations } from '@/features/inventory/services/inventory.service';
 import { toLocalDateInputValue } from '@/lib/utils/format';
 import {
   resolveProductPrice,
@@ -27,6 +30,7 @@ const invoiceItemSchema = z.object({
 const invoiceFormSchema = z
   .object({
     customer_id: z.string().min(1, 'Customer is required'),
+    stock_location_id: z.string().min(1, 'Stock location is required'),
     invoice_date: z.string().min(1, 'Invoice date is required'),
     due_date: z.string().optional(),
     tax_amount: z.number({ invalid_type_error: 'Required' }).min(0, 'Must be 0 or more'),
@@ -98,12 +102,14 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
     handleSubmit,
     control,
     watch,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       customer_id: '',
+      stock_location_id: '',
       invoice_date: todayForInput(),
       due_date: '',
       tax_amount: 0,
@@ -123,6 +129,22 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
     queryKey: ['products', { status: 'active' }],
     queryFn: () => getProducts({ status: 'active' }),
   });
+
+  const { data: stockLocations = [] } = useQuery({
+    queryKey: ['inventory', 'locations'],
+    queryFn: () => getStockLocations(true),
+  });
+
+  const defaultStockLocation =
+    stockLocations.find((location) => location.is_default) ?? stockLocations[0];
+
+  const stockLocationId = watch('stock_location_id');
+
+  useEffect(() => {
+    if (defaultStockLocation && !stockLocationId) {
+      setValue('stock_location_id', defaultStockLocation.id, { shouldValidate: true });
+    }
+  }, [defaultStockLocation, setValue, stockLocationId]);
 
   const customers = customersData?.customers || [];
   const products = productsData?.products || [];
@@ -180,6 +202,7 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
 
     const request: CreateInvoiceRequest = {
       customer_id: data.customer_id,
+      stock_location_id: data.stock_location_id,
       items: data.items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
       tax_amount: data.tax_amount,
       invoice_date: data.invoice_date,
@@ -218,8 +241,18 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
               {errors.customer_id && <p className="text-sm text-red-600">{errors.customer_id.message}</p>}
             </div>
 
-            {selectedCustomer && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <LocationSelect
+              label="Stock Location *"
+              locations={stockLocations}
+              value={stockLocationId}
+              onChange={(value) => setValue('stock_location_id', value, { shouldValidate: true })}
+              error={errors.stock_location_id?.message}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {selectedCustomer ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-slate-900">{selectedCustomer.name}</p>
                   <div className="flex gap-2">
@@ -252,7 +285,7 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 

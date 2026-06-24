@@ -2,43 +2,38 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cancelInvoice } from '@/features/billing/services/invoice.service';
+import { reverseStockIn } from '@/features/inventory/services/inventory.service';
 
-type CancelInvoiceModalProps = {
-  invoiceId: string;
-  invoiceNumber: string;
+type ReverseStockInModalProps = {
+  batchId: string;
+  referenceNumber: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
 };
 
-export function CancelInvoiceModal({
-  invoiceId,
-  invoiceNumber,
+export function ReverseStockInModal({
+  batchId,
+  referenceNumber,
   isOpen,
   onClose,
   onSuccess,
-}: CancelInvoiceModalProps) {
+}: ReverseStockInModalProps) {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () => cancelInvoice(invoiceId),
+    mutationFn: () => reverseStockIn(batchId),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['invoice', invoiceId] }),
-        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['reports'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
       onSuccess?.();
       onClose();
     },
     onError: (error) => {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Failed to cancel invoice. Please try again.',
-      );
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to reverse stock in.');
     },
   });
 
@@ -74,13 +69,13 @@ export function CancelInvoiceModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="cancel-invoice-title"
+        aria-labelledby="reverse-stock-in-title"
         className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h3 id="cancel-invoice-title" className="text-lg font-semibold text-slate-900">
-            Cancel Invoice
+          <h3 id="reverse-stock-in-title" className="text-lg font-semibold text-slate-900">
+            Reverse Stock In
           </h3>
           <button
             type="button"
@@ -94,10 +89,11 @@ export function CancelInvoiceModal({
 
         <div className="px-6 py-5">
           <p className="text-sm text-slate-600">
-            This will void the invoice. The invoice will remain visible as Cancelled and cannot
-            receive new payments.
+            Reverse Stock In #{referenceNumber}?
           </p>
-          <p className="mt-3 text-sm font-medium text-slate-900">{invoiceNumber}</p>
+          <p className="mt-3 text-sm text-slate-600">
+            This will create reversing inventory transactions and restore stock balances.
+          </p>
 
           {errorMessage && (
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -108,7 +104,7 @@ export function CancelInvoiceModal({
 
         <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
           <Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>
-            Keep Invoice
+            Cancel
           </Button>
           <Button
             type="button"
@@ -119,7 +115,7 @@ export function CancelInvoiceModal({
               mutation.mutate();
             }}
           >
-            Cancel Invoice
+            Reverse Stock In
           </Button>
         </div>
       </div>

@@ -236,6 +236,10 @@ export function InvoiceDetailsPage() {
                 <p className="text-sm font-medium text-slate-500">Invoice Date</p>
                 <p className="text-sm text-slate-900">{formatDate(invoice.invoice_date)}</p>
               </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-slate-500">Stock Location</p>
+                <p className="text-sm text-slate-900">{invoice.stock_location?.name ?? '—'}</p>
+              </div>
               <InvoiceStatusBadge status={invoice.status} />
             </div>
           </div>

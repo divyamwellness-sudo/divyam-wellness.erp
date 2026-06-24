@@ -29,10 +29,12 @@ export type InvoiceWithDetails = Invoice & {
   items: InvoiceItem[];
   payments: Payment[];
   customer?: Customer;
+  stock_location?: { id: string; name: string };
 };
 
 export type CreateInvoiceRequest = {
   customer_id: string;
+  stock_location_id: string;
   items: Array<{ product_id: string; quantity: number }>;
   invoice_date?: string;
   due_date?: string;
@@ -70,6 +72,12 @@ function handleSupabaseError(error: unknown, context: string): never {
 
       case 'P0001': {
         const message = supabaseError.message || 'Operation rejected by a business rule.';
+        if (/INSUFFICIENT_STOCK/i.test(message)) {
+          throw new InvoiceServiceError(
+            message.replace(/^INSUFFICIENT_STOCK:\s*/i, ''),
+            'INSUFFICIENT_STOCK',
+          );
+        }
         if (/exceeds amount due/i.test(message)) {
           throw new InvoiceServiceError(message, 'OVERPAYMENT');
         }
@@ -141,7 +149,7 @@ export async function getInvoiceById(id: string): Promise<InvoiceWithDetails> {
   try {
     const { data, error } = await supabase
       .from('invoices')
-      .select('*, items:invoice_items(*), payments(*), customer:customers(*)')
+      .select('*, items:invoice_items(*), payments(*), customer:customers(*), stock_location:stock_locations(id, name)')
       .eq('id', id)
       .single();
 
@@ -156,15 +164,17 @@ export async function getInvoiceById(id: string): Promise<InvoiceWithDetails> {
       items: InvoiceItem[] | null;
       payments: Payment[] | null;
       customer: Customer | null;
+      stock_location: { id: string; name: string } | null;
     };
 
-    const { items, payments, customer, ...invoice } = row;
+    const { items, payments, customer, stock_location, ...invoice } = row;
 
     return {
       ...invoice,
       items: items ?? [],
       payments: payments ?? [],
       customer: customer ?? undefined,
+      stock_location: stock_location ?? undefined,
     };
   } catch (error) {
     if (error instanceof InvoiceServiceError) {
@@ -227,6 +237,7 @@ export async function createInvoice(request: CreateInvoiceRequest): Promise<Invo
     // 4. Insert the invoice header (number/totals/status are DB-managed).
     const invoiceInsert: InvoiceInsert = {
       customer_id: request.customer_id,
+      stock_location_id: request.stock_location_id,
       customer_type: customer.customer_type,
       pricing_tier: tier,
       tax_amount: request.tax_amount ?? 0,

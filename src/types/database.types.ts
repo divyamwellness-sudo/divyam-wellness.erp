@@ -326,6 +326,39 @@ export type Database = {
           },
         ];
       };
+      stock_locations: {
+        Row: {
+          id: string;
+          name: string;
+          code: string | null;
+          is_active: boolean;
+          is_default: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          code?: string | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          code?: string | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       invoices: {
         Row: {
           id: string;
@@ -343,6 +376,7 @@ export type Database = {
           invoice_date: string;
           due_date: string;
           notes: string | null;
+          stock_location_id: string;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -363,6 +397,7 @@ export type Database = {
           invoice_date?: string;
           due_date?: string;
           notes?: string | null;
+          stock_location_id: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -383,6 +418,7 @@ export type Database = {
           invoice_date?: string;
           due_date?: string;
           notes?: string | null;
+          stock_location_id?: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -392,6 +428,12 @@ export type Database = {
             foreignKeyName: 'invoices_customer_id_fkey';
             columns: ['customer_id'];
             referencedRelation: 'customers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoices_stock_location_id_fkey';
+            columns: ['stock_location_id'];
+            referencedRelation: 'stock_locations';
             referencedColumns: ['id'];
           },
           {

@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Award,
   ArrowRight,
+  Package,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -128,7 +129,7 @@ export function DashboardPage() {
       {!isLoading && stats && (
         <>
           {/* Summary Cards */}
-          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <SummaryCard
               label="Today's Revenue"
               value={formatCurrency(stats.todaysRevenue)}
@@ -161,6 +162,13 @@ export function DashboardPage() {
               icon={<Award className="h-5 w-5 text-orange-600" />}
               accent="bg-orange-50"
               valueClassName="text-orange-600"
+            />
+            <SummaryCard
+              label="Stock Valuation"
+              value={formatCurrency(stats.totalStockValuation)}
+              icon={<Package className="h-5 w-5 text-teal-600" />}
+              accent="bg-teal-50"
+              valueClassName="text-teal-700"
             />
           </div>
 

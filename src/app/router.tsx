@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
+import { InventoryPage } from '@/features/inventory/pages/InventoryPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { CustomersPage } from '@/features/customers/pages/CustomersPage';
@@ -52,13 +52,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'inventory',
-            element: (
-              <PlaceholderPage
-                title="Inventory"
-                description="Track stock levels and inventory movements."
-                phase="Phase 3 — Inventory Module"
-              />
-            ),
+            element: <InventoryPage />,
           },
           {
             path: 'billing',

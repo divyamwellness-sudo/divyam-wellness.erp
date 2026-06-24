@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { toLocalDateInputValue } from '@/lib/utils/format';
+import { getTotalStockValuation } from '@/features/inventory/services/inventory.service';
 import type { Customer, Invoice, Payment } from '@/types/database.types';
 
 export type DashboardStats = {
@@ -8,6 +9,7 @@ export type DashboardStats = {
   totalCustomers: number;
   totalInvoices: number;
   totalVp: number;
+  totalStockValuation: number;
 };
 
 export type DashboardInvoice = Invoice & {
@@ -56,6 +58,14 @@ function todayDateString(): string {
   return toLocalDateInputValue();
 }
 
+async function getTotalStockValuationSafe(): Promise<number> {
+  try {
+    return await getTotalStockValuation();
+  } catch {
+    return 0;
+  }
+}
+
 export async function getDashboardData(): Promise<DashboardData> {
   try {
     const today = todayDateString();
@@ -67,6 +77,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       invoicesCountResult,
       recentInvoicesResult,
       recentPaymentsResult,
+      totalStockValuation,
     ] = await Promise.all([
       supabase.from('payments').select('amount').eq('payment_date', today),
       supabase.from('invoices').select('due_amount, total_vp').neq('status', 'cancelled'),
@@ -84,6 +95,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         .order('payment_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(5),
+      getTotalStockValuationSafe(),
     ]);
 
     if (todaysPaymentsResult.error) handleSupabaseError(todaysPaymentsResult.error, 'getDashboardData');
@@ -122,6 +134,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         totalCustomers: customersCountResult.count ?? 0,
         totalInvoices: invoicesCountResult.count ?? 0,
         totalVp: sumField(activeInvoices, 'total_vp'),
+        totalStockValuation,
       },
       recentInvoices,
       recentPayments,
