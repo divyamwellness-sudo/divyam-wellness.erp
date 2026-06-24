@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -216,25 +216,6 @@ export function InvoicesPage() {
     search: '',
   });
 
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) {
-      clearTimeout(toastTimer.current);
-    }
-    toastTimer.current = setTimeout(() => setToast(null), 3000);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) {
-        clearTimeout(toastTimer.current);
-      }
-    };
-  }, []);
-
   const {
     data: invoicesData,
     isLoading,
@@ -283,7 +264,7 @@ export function InvoicesPage() {
   };
 
   const handleViewInvoice = (invoice: Invoice) => {
-    showToast(`Viewing invoice ${invoice.invoice_number} is coming soon.`);
+    navigate(`/billing/invoices/${invoice.id}`);
   };
 
   return (
@@ -393,13 +374,6 @@ export function InvoicesPage() {
       {/* Invoice Table */}
       {!isLoading && (
         <InvoiceTable invoices={invoices} customerLabel={customerLabel} onView={handleViewInvoice} />
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg">
-          {toast}
-        </div>
       )}
     </div>
   );

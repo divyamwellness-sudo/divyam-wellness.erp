@@ -8,6 +8,8 @@ import { WeightTrackingPage } from '@/features/weight-tracking/pages/WeightTrack
 import { ProductsPage } from '@/features/products/pages/ProductsPage';
 import { InvoicesPage } from '@/features/billing/pages/InvoicesPage';
 import { CreateInvoicePage } from '@/features/billing/pages/CreateInvoicePage';
+import { InvoiceDetailsPage } from '@/features/billing/pages/InvoiceDetailsPage';
+import { ReportsPage } from '@/features/reports/pages/ReportsPage';
 import { ProtectedRoute, PublicOnlyRoute } from '@/hooks/useProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -65,14 +67,12 @@ export const router = createBrowserRouter([
             element: <CreateInvoicePage />,
           },
           {
+            path: 'billing/invoices/:id',
+            element: <InvoiceDetailsPage />,
+          },
+          {
             path: 'reports',
-            element: (
-              <PlaceholderPage
-                title="Reports"
-                description="Sales, VP, GST, and wellness progress reports."
-                phase="Phase 5 — Reports Module"
-              />
-            ),
+            element: <ReportsPage />,
           },
           {
             path: 'settings',
