@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { Leaf, LogOut, X } from 'lucide-react';
+import { APP_NAME } from '@/config/branding';
 import { navigation } from '@/config/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
@@ -26,9 +27,9 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-900">
-            {businessSettings?.business_name ?? 'Divyam Wellness'}
+            {businessSettings?.business_name ?? ''}
           </p>
-          <p className="truncate text-xs text-slate-500">Herbalife & Wellness ERP</p>
+          <p className="truncate text-xs text-slate-500">{APP_NAME}</p>
         </div>
         <button
           type="button"

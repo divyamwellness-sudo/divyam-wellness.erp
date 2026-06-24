@@ -32,7 +32,7 @@ export function AppLayout() {
             <Menu className="h-5 w-5" />
           </button>
           <p className="truncate text-sm font-semibold text-slate-900">
-            {businessSettings?.business_name ?? 'Divyam Wellness'}
+            {businessSettings?.business_name ?? ''}
           </p>
         </header>
 

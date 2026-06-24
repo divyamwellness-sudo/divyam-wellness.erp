@@ -184,7 +184,7 @@ export function SettingsPage() {
               label="Business Name *"
               {...register('business_name')}
               error={errors.business_name?.message}
-              placeholder="Divyam Wellness"
+              placeholder="Your business name"
             />
 
             <div className="space-y-1.5">

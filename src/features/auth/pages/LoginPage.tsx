@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Leaf } from 'lucide-react';
+import { APP_NAME, COMPANY_NAME } from '@/config/branding';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -32,10 +33,8 @@ export function LoginPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/20">
             <Leaf className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Divyam Wellness ERP</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Sign in to manage your Herbalife & wellness business
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">{APP_NAME}</h1>
+          <p className="mt-2 text-sm text-slate-500">Sign in to manage your business</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -45,7 +44,7 @@ export function LoginPage() {
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="admin@divyamwellness.com"
+              placeholder="you@company.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -75,7 +74,7 @@ export function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          Single admin access · Divyam Wellness
+          Single admin access · {COMPANY_NAME}
         </p>
       </div>
     </div>
