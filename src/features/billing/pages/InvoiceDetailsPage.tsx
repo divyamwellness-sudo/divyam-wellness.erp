@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CreditCard, Download, Printer } from 'lucide-react';
+import { ArrowLeft, Ban, CreditCard, Download, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AddPaymentModal } from '@/features/billing/components/AddPaymentModal';
+import { CancelInvoiceModal } from '@/features/billing/components/CancelInvoiceModal';
 import { InvoiceDocument } from '@/features/billing/components/InvoiceDocument';
 import { getInvoiceById } from '@/features/billing/services/invoice.service';
 import { getInvoicePdfFilename, paymentMethodLabels, sortInvoicePayments } from '@/features/billing/utils/invoiceDocument';
@@ -65,6 +66,9 @@ export function InvoiceDetailsPage() {
   const documentRef = useRef<HTMLDivElement>(null);
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelToast, setCancelToast] = useState<string | null>(null);
+  const cancelToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [documentActionError, setDocumentActionError] = useState<string | null>(null);
 
@@ -117,6 +121,22 @@ export function InvoiceDetailsPage() {
     handlePrint();
   };
 
+  useEffect(() => {
+    return () => {
+      if (cancelToastTimer.current) {
+        clearTimeout(cancelToastTimer.current);
+      }
+    };
+  }, []);
+
+  const handleCancelSuccess = () => {
+    setCancelToast('Invoice cancelled successfully.');
+    if (cancelToastTimer.current) {
+      clearTimeout(cancelToastTimer.current);
+    }
+    cancelToastTimer.current = setTimeout(() => setCancelToast(null), 3000);
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-12 text-center">
@@ -145,6 +165,8 @@ export function InvoiceDetailsPage() {
 
   const due = Number(invoice.due_amount);
   const canAddPayment = due > 0 && invoice.status !== 'cancelled';
+  const canCancelInvoice =
+    invoice.status !== 'cancelled' && Number(invoice.paid_amount) === 0;
   const payments = sortInvoicePayments(invoice.payments);
 
   return (
@@ -174,6 +196,12 @@ export function InvoiceDetailsPage() {
               <Download className="h-4 w-4" />
               {isGeneratingPdf ? 'Generating PDF…' : 'Download PDF'}
             </Button>
+            {canCancelInvoice && (
+              <Button variant="danger" onClick={() => setIsCancelModalOpen(true)}>
+                <Ban className="h-4 w-4" />
+                Cancel Invoice
+              </Button>
+            )}
             {canAddPayment && (
               <Button onClick={() => setIsPaymentModalOpen(true)}>
                 <CreditCard className="h-4 w-4" />
@@ -183,6 +211,12 @@ export function InvoiceDetailsPage() {
           </div>
         }
       />
+
+      {cancelToast && (
+        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+          {cancelToast}
+        </div>
+      )}
 
       {documentActionError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -409,6 +443,14 @@ export function InvoiceDetailsPage() {
         customerName={invoice.customer?.name}
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
+      />
+
+      <CancelInvoiceModal
+        invoiceId={invoice.id}
+        invoiceNumber={invoice.invoice_number}
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        onSuccess={handleCancelSuccess}
       />
     </div>
   );
