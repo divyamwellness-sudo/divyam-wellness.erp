@@ -115,9 +115,9 @@ export function ReportsPage() {
   });
 
   const dueQuery = useQuery({
-    queryKey: ['reports', 'due', dateRange],
+    queryKey: ['reports', 'due'],
     queryFn: () => getDueReport(dateRange),
-    enabled: rangeValid && activeTab === 'due',
+    enabled: activeTab === 'due',
   });
 
   const paymentsQuery = useQuery({
@@ -427,18 +427,18 @@ export function ReportsPage() {
         </>
       )}
 
-      {!activeQuery.isLoading && rangeValid && activeTab === 'due' && dueQuery.data && (
+      {!activeQuery.isLoading && activeTab === 'due' && dueQuery.data && (
         <>
           <SummaryStrip
             items={[
-              { label: 'Open Invoices', value: dueQuery.data.summary.count.toString() },
-              { label: 'Total Due', value: formatCurrency(dueQuery.data.summary.totalDue) },
+              { label: 'Invoices with Balance Due', value: dueQuery.data.summary.count.toString() },
+              { label: 'Total Outstanding Due', value: formatCurrency(dueQuery.data.summary.totalDue) },
             ]}
           />
           <ReportTable
             columns={dueColumns}
             rows={dueQuery.data.rows}
-            emptyMessage="No outstanding dues for this date range."
+            emptyMessage="No outstanding dues."
             rowKey={(row) => row.invoiceId}
             onRowClick={(row) => navigate(`/billing/invoices/${row.invoiceId}`)}
           />
@@ -467,16 +467,16 @@ export function ReportsPage() {
         <>
           <SummaryStrip
             items={[
-              { label: 'Customers', value: customersQuery.data.summary.count.toString() },
-              { label: 'Total Invoices', value: customersQuery.data.summary.totalInvoices.toString() },
-              { label: 'Total Spend', value: formatCurrency(customersQuery.data.summary.totalSpend) },
-              { label: 'Total VP', value: formatVP(customersQuery.data.summary.totalVp) },
+              { label: 'Customers with Activity', value: customersQuery.data.summary.count.toString() },
+              { label: 'Invoices in Period', value: customersQuery.data.summary.totalInvoices.toString() },
+              { label: 'Spend in Period', value: formatCurrency(customersQuery.data.summary.totalSpend) },
+              { label: 'VP in Period', value: formatVP(customersQuery.data.summary.totalVp) },
             ]}
           />
           <ReportTable
             columns={customerColumns}
             rows={customersQuery.data.rows}
-            emptyMessage="No customer activity found for this date range."
+            emptyMessage="No customers with invoice activity in this date range."
             rowKey={(row) => row.customerId}
           />
         </>

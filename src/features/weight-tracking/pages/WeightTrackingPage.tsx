@@ -7,7 +7,8 @@ import { Plus, Edit, Trash2, Scale, TrendingUp, TrendingDown, CalendarClock } fr
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { calculateAge } from '@/lib/utils/format';
+import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { calculateAge, toDateInputValue, toLocalDateInputValue } from '@/lib/utils/format';
 import {
   getWeightLogs,
   addWeightLog,
@@ -63,11 +64,6 @@ function formatDate(dateString: string): string {
     month: 'short',
     year: 'numeric',
   });
-}
-
-function formatDateForInput(dateString?: string): string {
-  if (!dateString) return new Date().toISOString().split('T')[0];
-  return new Date(dateString).toISOString().split('T')[0];
 }
 
 function Select({
@@ -172,7 +168,7 @@ function WeightLogForm({
       bmr: weightLog?.bmr || undefined,
       metabolic_age: weightLog?.metabolic_age || undefined,
       tsf: weightLog?.tsf || undefined,
-      recorded_date: formatDateForInput(weightLog?.recorded_date),
+      recorded_date: toDateInputValue(weightLog?.recorded_date),
       notes: weightLog?.notes || '',
     },
   });
@@ -222,7 +218,7 @@ function WeightLogForm({
             type="date"
             {...register('recorded_date')}
             error={errors.recorded_date?.message}
-            max={new Date().toISOString().split('T')[0]}
+            max={toLocalDateInputValue()}
           />
 
           <Input
@@ -655,12 +651,17 @@ export function WeightTrackingPage() {
   const queryClient = useQueryClient();
 
   // Queries
-  const { data: customersData } = useQuery({
+  const { data: customersData, isLoading: isLoadingCustomers, error: customersError, refetch: refetchCustomers } = useQuery({
     queryKey: ['customers', { status: 'active' }],
     queryFn: () => getCustomers({ status: 'active' }),
   });
 
-  const { data: weightLogs, isLoading: isLoadingLogs } = useQuery({
+  const {
+    data: weightLogs,
+    isLoading: isLoadingLogs,
+    error: weightLogsError,
+    refetch: refetchWeightLogs,
+  } = useQuery({
     queryKey: ['weightLogs', selectedCustomerId],
     queryFn: () => getWeightLogs(selectedCustomerId),
     enabled: !!selectedCustomerId,
@@ -700,13 +701,13 @@ export function WeightTrackingPage() {
   });
 
   // Event handlers
-  const handleAddWeightLog = async (data: WeightLogInsert) => {
-    await addMutation.mutateAsync(data);
+  const handleAddWeightLog = async (data: WeightLogInsert | WeightLogUpdate) => {
+    await addMutation.mutateAsync(data as WeightLogInsert);
   };
 
-  const handleUpdateWeightLog = async (data: WeightLogUpdate) => {
+  const handleUpdateWeightLog = async (data: WeightLogInsert | WeightLogUpdate) => {
     if (!selectedWeightLog) return;
-    await updateMutation.mutateAsync({ id: selectedWeightLog.id, data });
+    await updateMutation.mutateAsync({ id: selectedWeightLog.id, data: data as WeightLogUpdate });
   };
 
   const handleEditWeightLog = (weightLog: WeightLog) => {
@@ -728,6 +729,13 @@ export function WeightTrackingPage() {
   const customers = customersData?.customers || [];
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
+  const getMutationErrorMessage = () => {
+    if (addMutation.error instanceof Error) return addMutation.error.message;
+    if (updateMutation.error instanceof Error) return updateMutation.error.message;
+    if (deleteMutation.error instanceof Error) return deleteMutation.error.message;
+    return 'Something went wrong. Please try again.';
+  };
+
   return (
     <div>
       <PageHeader
@@ -735,19 +743,36 @@ export function WeightTrackingPage() {
         description="Monitor customer weight progress and body composition over time."
       />
 
-      {/* Customer Selection */}
-      <div className="mb-6">
-        <Select
-          label="Select Customer"
-          value={selectedCustomerId}
-          onChange={setSelectedCustomerId}
-          options={customers.map(customer => ({
-            value: customer.id,
-            label: `${customer.name} (${customer.phone})`,
-          }))}
-          placeholder="Choose a customer to track weight"
+      {(addMutation.error || updateMutation.error || deleteMutation.error) && (
+        <QueryErrorAlert message={getMutationErrorMessage()} />
+      )}
+
+      {customersError && (
+        <QueryErrorAlert
+          message="Failed to load customers. Please try again."
+          onRetry={() => void refetchCustomers()}
         />
-      </div>
+      )}
+
+      {isLoadingCustomers && !customersError ? (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-8 text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
+          <p className="mt-4 text-slate-500">Loading customers...</p>
+        </div>
+      ) : (
+        <div className="mb-6">
+          <Select
+            label="Select Customer"
+            value={selectedCustomerId}
+            onChange={setSelectedCustomerId}
+            options={customers.map(customer => ({
+              value: customer.id,
+              label: `${customer.name} (${customer.phone})`,
+            }))}
+            placeholder="Choose a customer to track weight"
+          />
+        </div>
+      )}
 
       {selectedCustomerId && selectedCustomer && (
         <>
@@ -787,24 +812,31 @@ export function WeightTrackingPage() {
             </div>
           )}
 
+          {weightLogsError && (
+            <QueryErrorAlert
+              message="Failed to load weight logs. Please try again."
+              onRetry={() => void refetchWeightLogs()}
+            />
+          )}
+
           {/* Weight Log Table */}
-          {isLoadingLogs ? (
+          {isLoadingLogs && !weightLogsError ? (
             <div className="rounded-xl border border-slate-200 bg-white p-12 text-center">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
               <p className="mt-4 text-slate-500">Loading weight logs...</p>
             </div>
-          ) : (
+          ) : !weightLogsError ? (
             <WeightLogTable
               weightLogs={weightLogs || []}
               onEdit={handleEditWeightLog}
               onDelete={handleDeleteWeightLog}
               isDeleting={deleteMutation.isPending}
             />
-          )}
+          ) : null}
         </>
       )}
 
-      {!selectedCustomerId && (
+      {!selectedCustomerId && !isLoadingCustomers && !customersError && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <Scale className="mx-auto h-12 w-12 text-slate-400" />
           <p className="mt-4 text-slate-500">Select a customer to start tracking their weight progress.</p>

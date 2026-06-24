@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { toLocalDateInputValue } from '@/lib/utils/format';
 import type { Customer, Invoice, Payment } from '@/types/database.types';
 
 export type DashboardStats = {
@@ -52,7 +53,7 @@ function sumField(rows: Array<Record<string, unknown>>, field: string): number {
 }
 
 function todayDateString(): string {
-  return new Date().toISOString().split('T')[0];
+  return toLocalDateInputValue();
 }
 
 export async function getDashboardData(): Promise<DashboardData> {

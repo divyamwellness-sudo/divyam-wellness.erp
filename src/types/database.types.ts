@@ -82,6 +82,7 @@ export type Database = {
           id: string;
           business_name: string;
           phone: string | null;
+          whatsapp_number: string | null;
           email: string | null;
           address: string | null;
           gstin: string | null;
@@ -94,6 +95,7 @@ export type Database = {
           id?: string;
           business_name?: string;
           phone?: string | null;
+          whatsapp_number?: string | null;
           email?: string | null;
           address?: string | null;
           gstin?: string | null;
@@ -106,6 +108,7 @@ export type Database = {
           id?: string;
           business_name?: string;
           phone?: string | null;
+          whatsapp_number?: string | null;
           email?: string | null;
           address?: string | null;
           gstin?: string | null;
@@ -509,6 +512,7 @@ export type Database = {
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type BusinessSettings = Database['public']['Tables']['business_settings']['Row'];
+export type BusinessSettingsUpdate = Database['public']['Tables']['business_settings']['Update'];
 
 export type Customer = Database['public']['Tables']['customers']['Row'];
 export type CustomerInsert = Database['public']['Tables']['customers']['Insert'];

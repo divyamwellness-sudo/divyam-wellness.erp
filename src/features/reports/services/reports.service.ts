@@ -77,7 +77,7 @@ export async function getSalesReport(
     return {
       rows,
       summary: {
-        count: rows.length,
+        count: activeRows.length,
         totalAmount: activeRows.reduce((sum, row) => sum + row.totalAmount, 0),
       },
     };
@@ -90,7 +90,7 @@ export async function getSalesReport(
 }
 
 export async function getDueReport(
-  range: ReportDateRange,
+  _range: ReportDateRange,
 ): Promise<{ rows: DueReportRow[]; summary: DueReportSummary }> {
   try {
     const { data, error } = await supabase
@@ -98,8 +98,6 @@ export async function getDueReport(
       .select('id, invoice_date, invoice_number, due_amount, customer:customers(name, phone)')
       .gt('due_amount', 0)
       .neq('status', 'cancelled')
-      .gte('invoice_date', range.dateFrom)
-      .lte('invoice_date', range.dateTo)
       .order('due_amount', { ascending: false });
 
     if (error) {

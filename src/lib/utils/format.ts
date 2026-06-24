@@ -35,3 +35,27 @@ export function calculateAge(dateOfBirth?: string | null): number | null {
 
   return age >= 0 ? age : null;
 }
+
+/** Local calendar date as YYYY-MM-DD for date inputs (not UTC). */
+export function toLocalDateInputValue(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** First day of the local calendar month as YYYY-MM-DD. */
+export function startOfLocalMonthInputValue(date: Date = new Date()): string {
+  return toLocalDateInputValue(new Date(date.getFullYear(), date.getMonth(), 1));
+}
+
+/** Map stored date/datetime to YYYY-MM-DD for `<input type="date" />` in local calendar. */
+export function toDateInputValue(dateString?: string | null): string {
+  if (!dateString) return toLocalDateInputValue();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return toLocalDateInputValue();
+  return toLocalDateInputValue(parsed);
+}

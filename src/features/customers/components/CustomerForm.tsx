@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { calculateAge } from '@/lib/utils/format';
+import { calculateAge, toDateInputValue, toLocalDateInputValue } from '@/lib/utils/format';
 import { TIERS_BY_CUSTOMER_TYPE } from '@/types';
 import type { Customer, CustomerInsert, CustomerUpdate, Gender, CustomerGoal, CustomerType, PricingTier } from '@/types';
 
@@ -70,11 +70,6 @@ const customerTypeOptions: Array<{ value: CustomerType; label: string }> = [
 
 function tierLabel(tier: PricingTier): string {
   return tier === 'MRP' ? 'MRP' : `${tier}%`;
-}
-
-function formatDateForInput(dateString?: string | null): string {
-  if (!dateString) return new Date().toISOString().split('T')[0];
-  return new Date(dateString).toISOString().split('T')[0];
 }
 
 function Select({
@@ -161,7 +156,7 @@ export function CustomerForm({ mode, customer, onSubmit, isLoading = false, onCa
       gender: customer?.gender || undefined,
       date_of_birth: customer?.date_of_birth || '',
       city: customer?.city || '',
-      joining_date: formatDateForInput(customer?.joining_date),
+      joining_date: toDateInputValue(customer?.joining_date),
       height_cm: customer?.height_cm || undefined,
       starting_weight: customer?.starting_weight || undefined,
       target_weight: customer?.target_weight || undefined,
@@ -256,7 +251,7 @@ export function CustomerForm({ mode, customer, onSubmit, isLoading = false, onCa
             type="date"
             {...register('date_of_birth')}
             error={errors.date_of_birth?.message}
-            max={new Date().toISOString().split('T')[0]}
+            max={toLocalDateInputValue()}
           />
 
           <Input

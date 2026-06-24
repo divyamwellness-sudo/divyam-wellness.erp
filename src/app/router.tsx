@@ -4,12 +4,14 @@ import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { CustomersPage } from '@/features/customers/pages/CustomersPage';
+import { CustomerDetailsPage } from '@/features/customers/pages/CustomerDetailsPage';
 import { WeightTrackingPage } from '@/features/weight-tracking/pages/WeightTrackingPage';
 import { ProductsPage } from '@/features/products/pages/ProductsPage';
 import { InvoicesPage } from '@/features/billing/pages/InvoicesPage';
 import { CreateInvoicePage } from '@/features/billing/pages/CreateInvoicePage';
 import { InvoiceDetailsPage } from '@/features/billing/pages/InvoiceDetailsPage';
 import { ReportsPage } from '@/features/reports/pages/ReportsPage';
+import { SettingsPage } from '@/features/settings/pages/SettingsPage';
 import { ProtectedRoute, PublicOnlyRoute } from '@/hooks/useProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -35,6 +37,10 @@ export const router = createBrowserRouter([
           {
             path: 'customers',
             element: <CustomersPage />,
+          },
+          {
+            path: 'customers/:id',
+            element: <CustomerDetailsPage />,
           },
           {
             path: 'weight-tracking',
@@ -76,13 +82,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'settings',
-            element: (
-              <PlaceholderPage
-                title="Settings"
-                description="Business profile and admin settings."
-                phase="Phase 5 — Settings Module"
-              />
-            ),
+            element: <SettingsPage />,
           },
         ],
       },

@@ -2,6 +2,7 @@ export type {
   Database,
   Profile,
   BusinessSettings,
+  BusinessSettingsUpdate,
   Customer,
   CustomerInsert,
   CustomerUpdate,

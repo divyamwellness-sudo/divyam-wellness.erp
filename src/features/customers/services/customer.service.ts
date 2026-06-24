@@ -1,10 +1,10 @@
 import { supabase } from '@/lib/supabase/client';
-import type { Customer, CustomerInsert, CustomerUpdate } from '@/types';
+import type { Customer, CustomerInsert, CustomerUpdate, CustomerType, PricingTier } from '@/types';
 
 export type CustomerFilters = {
   status?: 'active' | 'inactive' | 'all';
-  customerType?: string;
-  pricingTier?: string;
+  customerType?: CustomerType;
+  pricingTier?: PricingTier;
   city?: string;
 };
 

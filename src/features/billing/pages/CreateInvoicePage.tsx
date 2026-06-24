@@ -26,6 +26,8 @@ export function CreateInvoicePage() {
     onSuccess: (invoice) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
 
       setToast(`Invoice ${invoice.invoice_number} created successfully`);
       navTimer.current = setTimeout(() => navigate('/billing/invoices'), 1200);

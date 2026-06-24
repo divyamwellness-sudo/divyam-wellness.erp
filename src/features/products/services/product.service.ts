@@ -1,9 +1,9 @@
 import { supabase } from '@/lib/supabase/client';
-import type { Product, ProductInsert, ProductUpdate } from '@/types';
+import type { Product, ProductInsert, ProductUpdate, ProductCategory } from '@/types';
 
 export type ProductFilters = {
   status?: 'active' | 'inactive' | 'all';
-  category?: string;
+  category?: ProductCategory;
 };
 
 export type ProductListResponse = {

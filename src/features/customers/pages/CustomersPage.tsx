@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit, UserX, Filter } from 'lucide-react';
+import { Plus, Search, Edit, UserX, Filter, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
 import { calculateAge } from '@/lib/utils/format';
 import { CustomerForm } from '@/features/customers/components/CustomerForm';
 import {
@@ -116,11 +118,13 @@ function Select({
 
 function CustomerTable({
   customers,
+  onView,
   onEdit,
   onDeactivate,
   isDeactivating,
 }: {
   customers: Customer[];
+  onView: (customer: Customer) => void;
   onEdit: (customer: Customer) => void;
   onDeactivate: (id: string) => void;
   isDeactivating: boolean;
@@ -221,6 +225,14 @@ function CustomerTable({
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => onView(customer)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => onEdit(customer)}
                     >
                       <Edit className="h-4 w-4" />
@@ -249,13 +261,12 @@ function CustomerTable({
 }
 
 export function CustomersPage() {
+  const navigate = useNavigate();
   const [formMode, setFormMode] = useState<CustomerFormMode>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<CustomerFilters>({
     status: 'active',
-    customerType: '',
-    pricingTier: '',
   });
 
   const queryClient = useQueryClient();
@@ -265,6 +276,7 @@ export function CustomersPage() {
     data: customersData,
     isLoading: isLoadingCustomers,
     error: customersError,
+    refetch: refetchCustomers,
   } = useQuery({
     queryKey: ['customers', filters],
     queryFn: () => getCustomers(filters),
@@ -273,6 +285,8 @@ export function CustomersPage() {
   const {
     data: searchResults,
     isLoading: isSearching,
+    error: searchError,
+    refetch: refetchSearch,
   } = useQuery({
     queryKey: ['customers', 'search', searchTerm],
     queryFn: () => searchCustomers(searchTerm),
@@ -307,13 +321,17 @@ export function CustomersPage() {
   });
 
   // Event handlers
-  const handleCreateCustomer = async (data: CustomerInsert) => {
-    await createMutation.mutateAsync(data);
+  const handleCreateCustomer = async (data: CustomerInsert | CustomerUpdate) => {
+    await createMutation.mutateAsync(data as CustomerInsert);
   };
 
-  const handleUpdateCustomer = async (data: CustomerUpdate) => {
+  const handleUpdateCustomer = async (data: CustomerInsert | CustomerUpdate) => {
     if (!selectedCustomer) return;
-    await updateMutation.mutateAsync({ id: selectedCustomer.id, data });
+    await updateMutation.mutateAsync({ id: selectedCustomer.id, data: data as CustomerUpdate });
+  };
+
+  const handleViewCustomer = (customer: Customer) => {
+    navigate(`/customers/${customer.id}`);
   };
 
   const handleEditCustomer = (customer: Customer) => {
@@ -341,6 +359,16 @@ export function CustomersPage() {
 
   const displayedCustomers = searchTerm.length >= 2 ? (searchResults || []) : (customersData?.customers || []);
   const isLoading = isLoadingCustomers || isSearching;
+  const isSearchActive = searchTerm.length >= 2;
+  const listError = isSearchActive ? searchError : customersError;
+  const refetchList = isSearchActive ? refetchSearch : refetchCustomers;
+
+  const getMutationErrorMessage = () => {
+    if (createMutation.error instanceof Error) return createMutation.error.message;
+    if (updateMutation.error instanceof Error) return updateMutation.error.message;
+    if (deactivateMutation.error instanceof Error) return deactivateMutation.error.message;
+    return 'Something went wrong. Please try again.';
+  };
 
   if (formMode) {
     return (
@@ -349,6 +377,9 @@ export function CustomersPage() {
           title={formMode === 'create' ? 'Add Customer' : 'Edit Customer'}
           description={formMode === 'create' ? 'Add a new customer to your wellness program.' : 'Update customer information.'}
         />
+        {(createMutation.error || updateMutation.error) && (
+          <QueryErrorAlert message={getMutationErrorMessage()} />
+        )}
         <CustomerForm
           mode={formMode}
           customer={selectedCustomer || undefined}
@@ -372,6 +403,10 @@ export function CustomersPage() {
           </Button>
         }
       />
+
+      {deactivateMutation.error && (
+        <QueryErrorAlert message={getMutationErrorMessage()} />
+      )}
 
       {/* Filters and Search */}
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -416,7 +451,7 @@ export function CustomersPage() {
               className="w-full"
               onClick={() => {
                 setSearchTerm('');
-                setFilters({ status: 'active', customerType: '', pricingTier: '' });
+                setFilters({ status: 'active' });
               }}
             >
               <Filter className="h-4 w-4" />
@@ -438,10 +473,15 @@ export function CustomersPage() {
       </div>
 
       {/* Error State */}
-      {customersError && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-          <p>Error loading customers. Please try again.</p>
-        </div>
+      {listError && (
+        <QueryErrorAlert
+          message={
+            isSearchActive
+              ? 'Error searching customers. Please try again.'
+              : 'Error loading customers. Please try again.'
+          }
+          onRetry={() => void refetchList()}
+        />
       )}
 
       {/* Loading State */}
@@ -456,6 +496,7 @@ export function CustomersPage() {
       {!isLoading && (
         <CustomerTable
           customers={displayedCustomers}
+          onView={handleViewCustomer}
           onEdit={handleEditCustomer}
           onDeactivate={handleDeactivateCustomer}
           isDeactivating={deactivateMutation.isPending}

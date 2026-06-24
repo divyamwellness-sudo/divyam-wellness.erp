@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CreditCard } from 'lucide-react';
+import { ArrowLeft, CreditCard, Download, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AddPaymentModal } from '@/features/billing/components/AddPaymentModal';
+import { InvoiceDocument } from '@/features/billing/components/InvoiceDocument';
 import { getInvoiceById } from '@/features/billing/services/invoice.service';
+import { getInvoicePdfFilename, paymentMethodLabels, sortInvoicePayments } from '@/features/billing/utils/invoiceDocument';
+import { downloadInvoicePdf } from '@/features/billing/utils/invoicePdf';
+import { useInvoicePrint } from '@/features/billing/utils/invoicePrint';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { getBusinessSettings } from '@/features/settings/services/settings.service';
+import { formatCurrency, formatVP } from '@/lib/utils/currency';
+import { formatDate } from '@/lib/utils/format';
 import type { CustomerType, InvoiceStatus, PaymentMethod, PricingTier } from '@/types/database.types';
 
 const statusStyles: Record<InvoiceStatus, string> = {
@@ -21,33 +29,6 @@ const statusLabels: Record<InvoiceStatus, string> = {
   paid: 'Paid',
   cancelled: 'Cancelled',
 };
-
-const paymentMethodLabels: Record<PaymentMethod | 'other', string> = {
-  cash: 'Cash',
-  upi: 'UPI',
-  bank: 'Bank',
-  card: 'Card',
-  other: 'Other',
-};
-
-function formatCurrency(value: number): string {
-  return `₹${Number(value).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function formatVP(value: number): string {
-  return `${Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 })} VP`;
-}
-
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
   return (
@@ -80,7 +61,12 @@ function PricingTierBadge({ tier }: { tier: PricingTier }) {
 export function InvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { businessSettings: authBusinessSettings } = useAuth();
+  const documentRef = useRef<HTMLDivElement>(null);
+
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [documentActionError, setDocumentActionError] = useState<string | null>(null);
 
   const {
     data: invoice,
@@ -91,6 +77,45 @@ export function InvoiceDetailsPage() {
     queryFn: () => getInvoiceById(id!),
     enabled: !!id,
   });
+
+  const { data: fetchedBusinessSettings } = useQuery({
+    queryKey: ['businessSettings'],
+    queryFn: getBusinessSettings,
+    enabled: !authBusinessSettings,
+  });
+
+  const businessSettings = authBusinessSettings ?? fetchedBusinessSettings ?? null;
+  const canExportDocument = Boolean(invoice && businessSettings);
+
+  const handlePrint = useInvoicePrint(documentRef, invoice?.invoice_number ?? 'Invoice');
+
+  const handleDownloadPdf = async () => {
+    if (!documentRef.current || !invoice) {
+      setDocumentActionError('Invoice document is not ready.');
+      return;
+    }
+
+    setDocumentActionError(null);
+    setIsGeneratingPdf(true);
+
+    try {
+      await downloadInvoicePdf(documentRef.current, getInvoicePdfFilename(invoice.invoice_number));
+    } catch {
+      setDocumentActionError('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handlePrintClick = () => {
+    if (!canExportDocument) {
+      setDocumentActionError('Configure business settings before printing.');
+      return;
+    }
+
+    setDocumentActionError(null);
+    handlePrint();
+  };
 
   if (isLoading) {
     return (
@@ -120,9 +145,7 @@ export function InvoiceDetailsPage() {
 
   const due = Number(invoice.due_amount);
   const canAddPayment = due > 0 && invoice.status !== 'cancelled';
-  const payments = [...invoice.payments].sort(
-    (a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime(),
-  );
+  const payments = sortInvoicePayments(invoice.payments);
 
   return (
     <div>
@@ -130,10 +153,26 @@ export function InvoiceDetailsPage() {
         title={invoice.invoice_number}
         description={`Invoice date: ${formatDate(invoice.invoice_date)}`}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => navigate('/billing/invoices')}>
               <ArrowLeft className="h-4 w-4" />
               Back
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handlePrintClick}
+              disabled={!canExportDocument}
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => void handleDownloadPdf()}
+              disabled={!canExportDocument || isGeneratingPdf}
+            >
+              <Download className="h-4 w-4" />
+              {isGeneratingPdf ? 'Generating PDF…' : 'Download PDF'}
             </Button>
             {canAddPayment && (
               <Button onClick={() => setIsPaymentModalOpen(true)}>
@@ -145,9 +184,14 @@ export function InvoiceDetailsPage() {
         }
       />
 
+      {documentActionError && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {documentActionError}
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          {/* Invoice header */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -162,7 +206,6 @@ export function InvoiceDetailsPage() {
             </div>
           </div>
 
-          {/* Customer information */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold text-slate-700">Customer</h3>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -189,7 +232,6 @@ export function InvoiceDetailsPage() {
             </div>
           </div>
 
-          {/* Invoice items */}
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-6 py-4">
               <h3 className="text-sm font-semibold text-slate-700">Items</h3>
@@ -243,7 +285,6 @@ export function InvoiceDetailsPage() {
             )}
           </div>
 
-          {/* Payment history */}
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-6 py-4">
               <h3 className="text-sm font-semibold text-slate-700">Payment History</h3>
@@ -276,7 +317,8 @@ export function InvoiceDetailsPage() {
                           {formatDate(payment.payment_date)}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-700">
-                          {paymentMethodLabels[payment.payment_method as PaymentMethod] ?? payment.payment_method}
+                          {paymentMethodLabels[payment.payment_method as PaymentMethod] ??
+                            payment.payment_method}
                         </td>
                         <td className="px-6 py-4 text-right text-sm font-medium text-slate-900">
                           {formatCurrency(Number(payment.amount))}
@@ -293,7 +335,6 @@ export function InvoiceDetailsPage() {
           </div>
         </div>
 
-        {/* Summary */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 rounded-xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold text-slate-700">Summary</h3>
@@ -345,6 +386,16 @@ export function InvoiceDetailsPage() {
           </div>
         </div>
       </div>
+
+      {businessSettings && (
+        <div className="fixed left-[-9999px] top-0 -z-50 overflow-hidden" aria-hidden="true">
+          <InvoiceDocument
+            ref={documentRef}
+            invoice={invoice}
+            businessSettings={businessSettings}
+          />
+        </div>
+      )}
 
       <AddPaymentModal
         invoice={{

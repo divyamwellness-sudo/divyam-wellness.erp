@@ -7,18 +7,14 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { addPayment, type AddPaymentRequest } from '@/features/billing/services/payment.service';
+import { toLocalDateInputValue } from '@/lib/utils/format';
 import type { Invoice, InvoiceStatus, Payment, PaymentMethod } from '@/types/database.types';
 
-// 'other' is included per UI requirements. Persisting it requires extending the
-// payments_payment_method_check constraint and the PaymentMethod type (backend follow-up).
-type PaymentMethodOption = PaymentMethod | 'other';
-
-const paymentMethodOptions: Array<{ value: PaymentMethodOption; label: string }> = [
+const paymentMethodOptions: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
   { value: 'bank', label: 'Bank' },
   { value: 'card', label: 'Card' },
-  { value: 'other', label: 'Other' },
 ];
 
 const statusStyles: Record<InvoiceStatus, string> = {
@@ -43,7 +39,7 @@ function formatCurrency(value: number): string {
 }
 
 function todayForInput(): string {
-  return new Date().toISOString().split('T')[0];
+  return toLocalDateInputValue();
 }
 
 type AddPaymentModalProps = {
@@ -70,7 +66,7 @@ export function AddPaymentModal({ invoice, customerName, isOpen, onClose, onSucc
           .number({ invalid_type_error: 'Required' })
           .positive('Must be greater than 0')
           .max(due, `Amount cannot exceed due of ${formatCurrency(due)}`),
-        payment_method: z.enum(['cash', 'upi', 'bank', 'card', 'other'] as const),
+        payment_method: z.enum(['cash', 'upi', 'bank', 'card'] as const),
         payment_date: z.string().min(1, 'Payment date is required'),
         reference_num: z.string().optional(),
         notes: z.string().optional(),
@@ -126,6 +122,8 @@ export function AddPaymentModal({ invoice, customerName, isOpen, onClose, onSucc
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['payments', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
 
       setToast(`Payment of ${formatCurrency(Number(payment.amount))} recorded`);
       onSuccess?.(payment);
@@ -159,8 +157,7 @@ export function AddPaymentModal({ invoice, customerName, isOpen, onClose, onSucc
     const request: AddPaymentRequest = {
       invoice_id: invoice.id,
       amount: data.amount,
-      // Cast required until 'other' is added to the DB constraint + PaymentMethod type.
-      payment_method: data.payment_method as PaymentMethod,
+      payment_method: data.payment_method,
       payment_date: data.payment_date,
       reference_num: data.reference_num || null,
       notes: data.notes || null,

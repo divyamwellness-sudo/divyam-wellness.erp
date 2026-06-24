@@ -32,31 +32,39 @@ export async function signOut() {
 }
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+    if (error) {
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
   }
-
-  return data;
 }
 
 export async function fetchBusinessSettings(): Promise<BusinessSettings | null> {
-  const { data, error } = await supabase
-    .from('business_settings')
-    .select('*')
-    .limit(1)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('business_settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+    if (error) {
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
   }
-
-  return data;
 }
 
 export async function getCurrentSession() {

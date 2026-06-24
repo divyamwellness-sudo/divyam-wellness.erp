@@ -4,6 +4,7 @@ import { Plus, Search, Edit, Power, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
 import { ProductForm, productCategoryOptions } from '@/features/products/components/ProductForm';
 import {
   getProducts,
@@ -169,7 +170,6 @@ export function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<ProductFilters>({
     status: 'active',
-    category: '',
   });
 
   const queryClient = useQueryClient();
@@ -178,12 +178,18 @@ export function ProductsPage() {
     data: productsData,
     isLoading: isLoadingProducts,
     error: productsError,
+    refetch: refetchProducts,
   } = useQuery({
     queryKey: ['products', filters],
     queryFn: () => getProducts(filters),
   });
 
-  const { data: searchResults, isLoading: isSearching } = useQuery({
+  const {
+    data: searchResults,
+    isLoading: isSearching,
+    error: searchError,
+    refetch: refetchSearch,
+  } = useQuery({
     queryKey: ['products', 'search', searchTerm],
     queryFn: () => searchProducts(searchTerm),
     enabled: searchTerm.length >= 2,
@@ -214,13 +220,13 @@ export function ProductsPage() {
     },
   });
 
-  const handleCreateProduct = async (data: ProductInsert) => {
-    await createMutation.mutateAsync(data);
+  const handleCreateProduct = async (data: ProductInsert | ProductUpdate) => {
+    await createMutation.mutateAsync(data as ProductInsert);
   };
 
-  const handleUpdateProduct = async (data: ProductUpdate) => {
+  const handleUpdateProduct = async (data: ProductInsert | ProductUpdate) => {
     if (!selectedProduct) return;
-    await updateMutation.mutateAsync({ id: selectedProduct.id, data });
+    await updateMutation.mutateAsync({ id: selectedProduct.id, data: data as ProductUpdate });
   };
 
   const handleEditProduct = (product: Product) => {
@@ -246,6 +252,16 @@ export function ProductsPage() {
 
   const displayedProducts = searchTerm.length >= 2 ? searchResults || [] : productsData?.products || [];
   const isLoading = isLoadingProducts || isSearching;
+  const isSearchActive = searchTerm.length >= 2;
+  const listError = isSearchActive ? searchError : productsError;
+  const refetchList = isSearchActive ? refetchSearch : refetchProducts;
+
+  const getMutationErrorMessage = () => {
+    if (createMutation.error instanceof Error) return createMutation.error.message;
+    if (updateMutation.error instanceof Error) return updateMutation.error.message;
+    if (toggleMutation.error instanceof Error) return toggleMutation.error.message;
+    return 'Something went wrong. Please try again.';
+  };
 
   if (formMode) {
     return (
@@ -258,6 +274,9 @@ export function ProductsPage() {
               : 'Update product information and pricing.'
           }
         />
+        {(createMutation.error || updateMutation.error) && (
+          <QueryErrorAlert message={getMutationErrorMessage()} />
+        )}
         <ProductForm
           mode={formMode}
           product={selectedProduct || undefined}
@@ -281,6 +300,10 @@ export function ProductsPage() {
           </Button>
         }
       />
+
+      {toggleMutation.error && (
+        <QueryErrorAlert message={getMutationErrorMessage()} />
+      )}
 
       {/* Filters and Search */}
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -318,7 +341,7 @@ export function ProductsPage() {
               className="w-full"
               onClick={() => {
                 setSearchTerm('');
-                setFilters({ status: 'active', category: '' });
+                setFilters({ status: 'active' });
               }}
             >
               <Filter className="h-4 w-4" />
@@ -338,10 +361,15 @@ export function ProductsPage() {
       </div>
 
       {/* Error State */}
-      {productsError && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-          <p>Error loading products. Please try again.</p>
-        </div>
+      {listError && (
+        <QueryErrorAlert
+          message={
+            isSearchActive
+              ? 'Error searching products. Please try again.'
+              : 'Error loading products. Please try again.'
+          }
+          onRetry={() => void refetchList()}
+        />
       )}
 
       {/* Loading State */}

@@ -1,3 +1,5 @@
+import { startOfLocalMonthInputValue, toLocalDateInputValue } from '@/lib/utils/format';
+
 type ReportDateFilterProps = {
   dateFrom: string;
   dateTo: string;
@@ -5,23 +7,16 @@ type ReportDateFilterProps = {
   onReset: () => void;
 };
 
-function todayForInput(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-function startOfMonthForInput(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-}
-
 export function getDefaultReportDateRange(): { dateFrom: string; dateTo: string } {
   return {
-    dateFrom: startOfMonthForInput(),
-    dateTo: todayForInput(),
+    dateFrom: startOfLocalMonthInputValue(),
+    dateTo: toLocalDateInputValue(),
   };
 }
 
 export function ReportDateFilter({ dateFrom, dateTo, onChange, onReset }: ReportDateFilterProps) {
+  const today = toLocalDateInputValue();
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid gap-4 md:grid-cols-4">
@@ -48,7 +43,7 @@ export function ReportDateFilter({ dateFrom, dateTo, onChange, onReset }: Report
             type="date"
             value={dateTo}
             min={dateFrom}
-            max={todayForInput()}
+            max={today}
             onChange={(e) => onChange('dateTo', e.target.value)}
             className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           />

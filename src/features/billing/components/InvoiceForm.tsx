@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { getCustomers } from '@/features/customers/services/customer.service';
 import { getProducts } from '@/features/products/services/product.service';
 import { getInvoices, type CreateInvoiceRequest } from '@/features/billing/services/invoice.service';
+import { toLocalDateInputValue } from '@/lib/utils/format';
 import {
   resolveProductPrice,
   type CustomerType,
@@ -67,7 +68,7 @@ function formatVP(value: number): string {
 }
 
 function todayForInput(): string {
-  return new Date().toISOString().split('T')[0];
+  return toLocalDateInputValue();
 }
 
 function CustomerTypeBadge({ type }: { type: CustomerType }) {

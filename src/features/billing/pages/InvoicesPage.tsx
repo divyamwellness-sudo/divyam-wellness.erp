@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
 import { getInvoices, type InvoiceFilters } from '@/features/billing/services/invoice.service';
 import { getCustomers } from '@/features/customers/services/customer.service';
 import type { Invoice, InvoiceStatus } from '@/types/database.types';
@@ -220,6 +221,7 @@ export function InvoicesPage() {
     data: invoicesData,
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['invoices', filters],
     queryFn: () => getInvoices(filters),
@@ -232,6 +234,11 @@ export function InvoicesPage() {
 
   const invoices = invoicesData?.invoices || [];
   const customers = customersData?.customers || [];
+
+  const isFiltered =
+    (filters.status && filters.status !== 'all') ||
+    Boolean(filters.customerId) ||
+    Boolean(filters.search?.trim());
 
   const customerLabel = (customerId: string) => {
     const customer = customers.find((c) => c.id === customerId);
@@ -283,25 +290,25 @@ export function InvoicesPage() {
       {/* Summary Cards */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
-          label="Total Invoices"
+          label={isFiltered ? 'Filtered Invoices' : 'Total Invoices'}
           value={invoices.length.toLocaleString('en-IN')}
           icon={<Receipt className="h-5 w-5 text-brand-600" />}
           accent="bg-brand-50"
         />
         <SummaryCard
-          label="Total Revenue"
+          label={isFiltered ? 'Filtered Revenue' : 'Total Revenue'}
           value={formatCurrency(totalRevenue)}
           icon={<IndianRupee className="h-5 w-5 text-green-600" />}
           accent="bg-green-50"
         />
         <SummaryCard
-          label="Total Due"
+          label={isFiltered ? 'Filtered Due' : 'Total Due'}
           value={formatCurrency(totalDue)}
           icon={<AlertCircle className="h-5 w-5 text-red-600" />}
           accent="bg-red-50"
         />
         <SummaryCard
-          label="Total VP"
+          label={isFiltered ? 'Filtered VP' : 'Total VP'}
           value={formatVP(totalVP)}
           icon={<Award className="h-5 w-5 text-orange-600" />}
           accent="bg-orange-50"
@@ -358,9 +365,10 @@ export function InvoicesPage() {
 
       {/* Error State */}
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-          <p>Error loading invoices. Please try again.</p>
-        </div>
+        <QueryErrorAlert
+          message="Error loading invoices. Please try again."
+          onRetry={() => void refetch()}
+        />
       )}
 
       {/* Loading State */}
