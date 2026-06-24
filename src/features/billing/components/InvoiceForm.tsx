@@ -1,4 +1,4 @@
-import { useForm, useFieldArray, type SubmitHandler } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { getCustomers } from '@/features/customers/services/customer.service';
 import { getProducts } from '@/features/products/services/product.service';
 import { getInvoices, type CreateInvoiceRequest } from '@/features/billing/services/invoice.service';
+import { ProductSearchCombobox } from '@/features/billing/components/ProductSearchCombobox';
 import { toLocalDateInputValue } from '@/lib/utils/format';
 import {
   resolveProductPrice,
@@ -288,27 +289,22 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
                     {/* Product */}
                     <div className="space-y-1.5 md:col-span-5">
                       <label className="block text-xs font-medium text-slate-500">Product</label>
-                      <select
-                        {...register(`items.${index}.product_id`)}
-                        className={`flex h-10 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
-                          itemError?.product_id ? 'border-red-500' : 'border-slate-200'
-                        }`}
-                      >
-                        <option value="">Select a product</option>
-                        {products.map((product) => {
-                          const takenElsewhere =
-                            selectedProductIds.includes(product.id) &&
-                            watchedItems[index]?.product_id !== product.id;
-                          return (
-                            <option key={product.id} value={product.id} disabled={takenElsewhere}>
-                              {product.name} ({product.sku})
-                            </option>
-                          );
-                        })}
-                      </select>
-                      {itemError?.product_id && (
-                        <p className="text-xs text-red-600">{itemError.product_id.message}</p>
-                      )}
+                      <Controller
+                        name={`items.${index}.product_id`}
+                        control={control}
+                        render={({ field }) => (
+                          <ProductSearchCombobox
+                            id={`items.${index}.product_id`}
+                            products={products}
+                            value={field.value}
+                            onChange={field.onChange}
+                            disabledProductIds={selectedProductIds.filter(
+                              (productId) => productId !== field.value,
+                            )}
+                            error={itemError?.product_id?.message}
+                          />
+                        )}
+                      />
                     </div>
 
                     {/* Quantity */}
