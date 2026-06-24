@@ -21,6 +21,7 @@ export type ProgressSummary = {
   latestMetabolicAge: number | null;
   firstBmi: number | null;
   latestBmi: number | null;
+  transformationPeriod: string | null;
 };
 
 export type ProgressAnalytics = {
@@ -70,6 +71,61 @@ function lastLogWithField(
   return undefined;
 }
 
+function parseDateParts(dateString: string): { year: number; month: number; day: number } {
+  const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+  return { year, month, day };
+}
+
+function calendarDiff(
+  startDate: string,
+  endDate: string,
+): { years: number; months: number; days: number } {
+  const start = parseDateParts(startDate);
+  const end = parseDateParts(endDate);
+
+  let years = end.year - start.year;
+  let months = end.month - start.month;
+  let days = end.day - start.day;
+
+  if (days < 0) {
+    months -= 1;
+    days += new Date(end.year, end.month - 1, 0).getDate();
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  return { years, months, days };
+}
+
+function pluralize(value: number, singular: string, plural: string): string {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+export function formatTransformationPeriod(startDate: string, endDate: string): string {
+  const { years, months, days } = calendarDiff(startDate, endDate);
+
+  if (years >= 1) {
+    const parts: string[] = [pluralize(years, 'year', 'years')];
+    if (months > 0) {
+      parts.push(pluralize(months, 'month', 'months'));
+    }
+    return parts.join(' ');
+  }
+
+  if (months >= 1) {
+    const parts: string[] = [pluralize(months, 'month', 'months')];
+    if (days > 0) {
+      parts.push(pluralize(days, 'day', 'days'));
+    }
+    return parts.join(' ');
+  }
+
+  return pluralize(days, 'day', 'days');
+}
+
 export function buildProgressAnalytics(logs: WeightLog[], customer: Customer): ProgressAnalytics {
   const firstWeightLog = logs[0];
   const latestWeightLog = logs.length > 0 ? logs[logs.length - 1] : undefined;
@@ -93,6 +149,11 @@ export function buildProgressAnalytics(logs: WeightLog[], customer: Customer): P
 
   const latestMetabolicLog = lastLogWithField(logs, 'metabolic_age');
   const latestMetabolicAge = latestMetabolicLog?.metabolic_age ?? null;
+
+  const transformationPeriod =
+    logs.length >= 2
+      ? formatTransformationPeriod(logs[0].recorded_date, logs[logs.length - 1].recorded_date)
+      : null;
 
   const charts: MetricChartData[] = [
     {
@@ -136,6 +197,7 @@ export function buildProgressAnalytics(logs: WeightLog[], customer: Customer): P
       latestMetabolicAge: latestMetabolicAge != null ? Number(latestMetabolicAge) : null,
       firstBmi: firstBmi != null ? Number(firstBmi) : null,
       latestBmi: latestBmi != null ? Number(latestBmi) : null,
+      transformationPeriod,
     },
     charts,
   };

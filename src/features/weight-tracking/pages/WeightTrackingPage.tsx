@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { CustomerCombobox } from '@/features/customers/components/CustomerCombobox';
 import { calculateAge, toDateInputValue, toLocalDateInputValue } from '@/lib/utils/format';
 import {
   getWeightLogs,
@@ -64,43 +65,6 @@ function formatDate(dateString: string): string {
     month: 'short',
     year: 'numeric',
   });
-}
-
-function Select({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder = 'Select an option',
-  error,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-  placeholder?: string;
-  error?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-slate-700">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`flex h-10 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
-          error ? 'border-red-500' : 'border-slate-200'
-        }`}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-    </div>
-  );
 }
 
 function Textarea({
@@ -191,11 +155,6 @@ function WeightLogForm({
     await onSubmit(processedData);
   };
 
-  const customerOptions = customers.map((customer) => ({
-    value: customer.id,
-    label: `${customer.name} (${customer.phone})`,
-  }));
-
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h3 className="mb-4 text-lg font-semibold text-slate-900">
@@ -204,13 +163,15 @@ function WeightLogForm({
       
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
-          <Select
+          <CustomerCombobox
             label="Customer *"
+            customers={customers}
             value={selectedCustomerId}
-            onChange={(value) => setValue('customer_id', value)}
-            options={customerOptions}
-            placeholder="Select customer"
+            onChange={(customerId) =>
+              setValue('customer_id', customerId, { shouldValidate: true })
+            }
             error={errors.customer_id?.message}
+            placeholder="Search customer..."
           />
 
           <Input
@@ -761,15 +722,12 @@ export function WeightTrackingPage() {
         </div>
       ) : (
         <div className="mb-6">
-          <Select
+          <CustomerCombobox
             label="Select Customer"
+            customers={customers}
             value={selectedCustomerId}
             onChange={setSelectedCustomerId}
-            options={customers.map(customer => ({
-              value: customer.id,
-              label: `${customer.name} (${customer.phone})`,
-            }))}
-            placeholder="Choose a customer to track weight"
+            placeholder="Search customer..."
           />
         </div>
       )}

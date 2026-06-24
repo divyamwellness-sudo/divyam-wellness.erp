@@ -249,7 +249,7 @@ export function InvoicesPage() {
     { value: '', label: 'All Customers' },
     ...customers.map((customer) => ({
       value: customer.id,
-      label: `${customer.name} (${customer.phone})`,
+      label: customer.name,
     })),
   ];
 

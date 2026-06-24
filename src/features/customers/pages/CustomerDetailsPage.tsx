@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Scale, TrendingDown, TrendingUp, CalendarClock, Activity } from 'lucide-react';
+import { ArrowLeft, Scale, TrendingDown, TrendingUp, Calendar, CalendarClock, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
@@ -231,7 +231,7 @@ export function CustomerDetailsPage() {
       ) : !weightLogsError && logs.length > 0 ? (
         <>
           {/* Summary cards */}
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <SummaryCard
               label="Starting Weight"
               value={summary?.startingWeight != null ? `${summary.startingWeight} kg` : '—'}
@@ -275,6 +275,12 @@ export function CustomerDetailsPage() {
               }
               icon={<CalendarClock className="h-5 w-5 text-orange-600" />}
               accent="bg-orange-50"
+            />
+            <SummaryCard
+              label="Transformation Period"
+              value={summary?.transformationPeriod ?? '—'}
+              icon={<Calendar className="h-5 w-5 text-teal-600" />}
+              accent="bg-teal-50"
             />
           </div>
 
