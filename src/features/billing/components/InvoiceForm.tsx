@@ -291,19 +291,7 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
 
         {/* Invoice Items */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-700">Items</h3>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => append({ product_id: '', quantity: 1 })}
-              disabled={!selectedCustomer}
-            >
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-700">Items</h3>
 
           {!selectedCustomer ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
@@ -390,6 +378,17 @@ export function InvoiceForm({ onSubmit, onCancel, isLoading = false }: InvoiceFo
               {errors.items && typeof errors.items.message === 'string' && (
                 <p className="text-sm text-red-600">{errors.items.message}</p>
               )}
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => append({ product_id: '', quantity: 1 })}
+              >
+                <Plus className="h-4 w-4" />
+                Add Item
+              </Button>
             </div>
           )}
         </div>

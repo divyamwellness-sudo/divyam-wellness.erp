@@ -113,18 +113,7 @@ export function StockInForm({ locations, products, defaultLocationId }: StockInF
       />
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-slate-700">Products</h4>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setLines((current) => [...current, createLine()])}
-          >
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
-        </div>
+        <h4 className="text-sm font-semibold text-slate-700">Products</h4>
 
         {lines.map((line) => (
           <div
@@ -164,6 +153,17 @@ export function StockInForm({ locations, products, defaultLocationId }: StockInF
             </div>
           </div>
         ))}
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full sm:w-auto"
+          onClick={() => setLines((current) => [...current, createLine()])}
+        >
+          <Plus className="h-4 w-4" />
+          Add Product
+        </Button>
       </div>
 
       <Input
