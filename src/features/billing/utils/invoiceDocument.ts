@@ -27,6 +27,22 @@ export function sortInvoicePayments(payments: Payment[]): Payment[] {
   );
 }
 
+/** Posted payments only — used for print/PDF where reversed entries are excluded. */
+export function getActiveInvoicePayments(payments: Payment[]): Payment[] {
+  return payments.filter((payment) => payment.status !== 'REVERSED');
+}
+
+export function sortActiveInvoicePayments(payments: Payment[]): Payment[] {
+  return sortInvoicePayments(getActiveInvoicePayments(payments));
+}
+
+export function sumActivePaymentAmount(payments: Payment[]): number {
+  return getActiveInvoicePayments(payments).reduce(
+    (sum, payment) => sum + Number(payment.amount),
+    0,
+  );
+}
+
 export function formatPricingTier(tier: string): string {
   return tier === 'MRP' ? 'MRP' : `${tier}%`;
 }

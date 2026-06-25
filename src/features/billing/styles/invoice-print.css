@@ -296,6 +296,13 @@
   color: #0f172a;
 }
 
+.invoice-document__empty-payments {
+  margin: 0;
+  color: #64748b;
+  font-size: 10pt;
+  font-style: italic;
+}
+
 .invoice-document__notes {
   margin: 0;
   padding: 12px;

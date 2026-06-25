@@ -4,7 +4,8 @@ import { formatCurrency, formatVP } from '@/lib/utils/currency';
 import {
   invoiceStatusLabels,
   paymentMethodLabels,
-  sortInvoicePayments,
+  sortActiveInvoicePayments,
+  sumActivePaymentAmount,
   type InvoiceDocumentProps,
 } from '@/features/billing/utils/invoiceDocument';
 import '@/features/billing/styles/invoice-print.css';
@@ -18,11 +19,13 @@ function statusClassName(status: InvoiceDocumentProps['invoice']['status']): str
 
 export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
   function InvoiceDocument({ invoice, businessSettings }, ref) {
-    const payments = sortInvoicePayments(invoice.payments);
-    const due = Number(invoice.due_amount);
+    const activePayments = sortActiveInvoicePayments(invoice.payments);
+    const paidAmount = sumActivePaymentAmount(invoice.payments);
+    const due = Number(invoice.total_amount) - paidAmount;
     const showDueHighlight = due > 0 && invoice.status !== 'cancelled';
     const customer = invoice.customer;
     const showVp = invoice.customer_type === 'coach';
+    const showPaymentHistory = invoice.payments.length > 0;
 
     return (
       <div ref={ref} className="invoice-document">
@@ -157,7 +160,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           <div className="invoice-document__payment-summary-row">
             <span>Paid Amount</span>
             <span className="invoice-document__amount-paid">
-              {formatCurrency(Number(invoice.paid_amount))}
+              {formatCurrency(paidAmount)}
             </span>
           </div>
           <div
@@ -178,40 +181,37 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           </div>
         </div>
 
-        {payments.length > 0 && (
+        {showPaymentHistory && (
           <section className="invoice-document__section">
             <h3 className="invoice-document__section-title">Payment History</h3>
-            <table className="invoice-document__table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Method</th>
-                  <th className="text-right">Amount</th>
-                  <th>Reference</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((payment) => {
-                  const isReversed = payment.status === 'REVERSED';
-
-                  return (
-                  <tr key={payment.id}>
-                    <td>{formatDate(payment.payment_date)}</td>
-                    <td>
-                      {paymentMethodLabels[payment.payment_method as keyof typeof paymentMethodLabels] ??
-                        payment.payment_method}
-                    </td>
-                    <td className={`text-right${isReversed ? ' invoice-document__amount-reversed' : ''}`}>
-                      {formatCurrency(Number(payment.amount))}
-                    </td>
-                    <td>{payment.reference_num || '—'}</td>
-                    <td>{isReversed ? 'Reversed' : 'Posted'}</td>
+            {activePayments.length > 0 ? (
+              <table className="invoice-document__table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Method</th>
+                    <th className="text-right">Amount</th>
+                    <th>Reference</th>
                   </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {activePayments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td>{formatDate(payment.payment_date)}</td>
+                      <td>
+                        {paymentMethodLabels[
+                          payment.payment_method as keyof typeof paymentMethodLabels
+                        ] ?? payment.payment_method}
+                      </td>
+                      <td className="text-right">{formatCurrency(Number(payment.amount))}</td>
+                      <td>{payment.reference_num || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="invoice-document__empty-payments">No active payments recorded.</p>
+            )}
           </section>
         )}
 
