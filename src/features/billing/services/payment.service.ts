@@ -37,11 +37,23 @@ function handleSupabaseError(error: unknown, context: string): never {
 
       case 'P0001': {
         const message = supabaseError.message || 'Operation rejected by a business rule.';
+        if (/ALREADY_REVERSED/i.test(message)) {
+          throw new PaymentServiceError(
+            message.replace(/^ALREADY_REVERSED:\s*/, ''),
+            'ALREADY_REVERSED',
+          );
+        }
         if (/exceeds amount due/i.test(message)) {
           throw new PaymentServiceError(message, 'OVERPAYMENT');
         }
         if (/cancelled/i.test(message)) {
           throw new PaymentServiceError(message, 'INVOICE_CANCELLED');
+        }
+        if (/cannot modify a reversed payment/i.test(message)) {
+          throw new PaymentServiceError(message, 'PAYMENT_REVERSED');
+        }
+        if (/cannot be deleted/i.test(message)) {
+          throw new PaymentServiceError(message, 'DELETE_NOT_ALLOWED');
         }
         throw new PaymentServiceError(message, 'BUSINESS_RULE');
       }
@@ -137,6 +149,38 @@ export async function updatePayment(id: string, data: PaymentUpdate): Promise<Pa
       throw error;
     }
     handleSupabaseError(error, 'updatePayment');
+  }
+}
+
+export async function reversePayment(
+  paymentId: string,
+  notes?: string | null,
+): Promise<string> {
+  try {
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: 'reverse_payment',
+        args: { p_payment_id: string; p_notes: string | null },
+      ) => Promise<{ data: string | null; error: { message: string; code?: string } | null }>
+    )('reverse_payment', {
+      p_payment_id: paymentId,
+      p_notes: notes ?? null,
+    });
+
+    if (error) {
+      handleSupabaseError(error, 'reversePayment');
+    }
+
+    if (!data) {
+      throw new PaymentServiceError('Payment reversal did not return an audit id.', 'NO_DATA');
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof PaymentServiceError) {
+      throw error;
+    }
+    handleSupabaseError(error, 'reversePayment');
   }
 }
 

@@ -79,7 +79,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       recentPaymentsResult,
       totalStockValuation,
     ] = await Promise.all([
-      supabase.from('payments').select('amount').eq('payment_date', today),
+      supabase.from('payments').select('amount').eq('payment_date', today).eq('status', 'POSTED'),
       supabase.from('invoices').select('due_amount, total_vp').neq('status', 'cancelled'),
       supabase.from('customers').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       supabase.from('invoices').select('*', { count: 'exact', head: true }),
@@ -92,6 +92,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       supabase
         .from('payments')
         .select('*, invoice:invoices(invoice_number)')
+        .eq('status', 'POSTED')
         .order('payment_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(5),

@@ -138,7 +138,8 @@ export async function getPaymentReport(
   try {
     const { data, error } = await supabase
       .from('payments')
-      .select('id, payment_date, amount, payment_method, reference_num, invoice_id, invoice:invoices(invoice_number)')
+      .select('id, payment_date, amount, payment_method, reference_num, invoice_id, status, invoice:invoices(invoice_number)')
+      .eq('status', 'POSTED')
       .gte('payment_date', range.dateFrom)
       .lte('payment_date', range.dateTo)
       .order('payment_date', { ascending: false });

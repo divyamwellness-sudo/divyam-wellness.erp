@@ -32,6 +32,8 @@ export type InvoiceStatus = 'created' | 'partial' | 'paid' | 'cancelled';
 
 export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'card';
 
+export type PaymentStatus = 'POSTED' | 'REVERSED';
+
 /**
  * Maps a pricing tier to the product price column that holds its price.
  * Single source of truth shared by the catalog UI and the future Billing module.
@@ -498,6 +500,58 @@ export type Database = {
           },
         ];
       };
+      payment_reversals: {
+        Row: {
+          id: string;
+          payment_id: string;
+          invoice_id: string;
+          amount: number;
+          payment_method: string;
+          payment_date: string;
+          reference_num: string | null;
+          reversed_at: string;
+          reversed_by: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          payment_id: string;
+          invoice_id: string;
+          amount: number;
+          payment_method: string;
+          payment_date: string;
+          reference_num?: string | null;
+          reversed_at?: string;
+          reversed_by?: string | null;
+          notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          payment_id?: string;
+          invoice_id?: string;
+          amount?: number;
+          payment_method?: string;
+          payment_date?: string;
+          reference_num?: string | null;
+          reversed_at?: string;
+          reversed_by?: string | null;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'payment_reversals_payment_id_fkey';
+            columns: ['payment_id'];
+            referencedRelation: 'payments';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payment_reversals_invoice_id_fkey';
+            columns: ['invoice_id'];
+            referencedRelation: 'invoices';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       payments: {
         Row: {
           id: string;
@@ -507,6 +561,9 @@ export type Database = {
           payment_date: string;
           reference_num: string | null;
           notes: string | null;
+          status: PaymentStatus;
+          reversed_at: string | null;
+          reversed_by: string | null;
           created_by: string | null;
           created_at: string;
         };
@@ -518,6 +575,9 @@ export type Database = {
           payment_date?: string;
           reference_num?: string | null;
           notes?: string | null;
+          status?: PaymentStatus;
+          reversed_at?: string | null;
+          reversed_by?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -529,6 +589,9 @@ export type Database = {
           payment_date?: string;
           reference_num?: string | null;
           notes?: string | null;
+          status?: PaymentStatus;
+          reversed_at?: string | null;
+          reversed_by?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -582,6 +645,8 @@ export type InvoiceItemUpdate = Database['public']['Tables']['invoice_items']['U
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
 export type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
+
+export type PaymentReversal = Database['public']['Tables']['payment_reversals']['Row'];
 
 /** Resolves the price of a product for a given pricing tier. */
 export function resolveProductPrice(product: Product, tier: PricingTier): number {

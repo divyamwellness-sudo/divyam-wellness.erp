@@ -277,6 +277,11 @@
   background: #fef2f2;
 }
 
+.invoice-document__amount-reversed {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
 .invoice-document__amount-paid {
   color: #15803d;
   font-weight: 700;

@@ -188,20 +188,28 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                   <th>Method</th>
                   <th className="text-right">Amount</th>
                   <th>Reference</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {payments.map((payment) => (
+                {payments.map((payment) => {
+                  const isReversed = payment.status === 'REVERSED';
+
+                  return (
                   <tr key={payment.id}>
                     <td>{formatDate(payment.payment_date)}</td>
                     <td>
                       {paymentMethodLabels[payment.payment_method as keyof typeof paymentMethodLabels] ??
                         payment.payment_method}
                     </td>
-                    <td className="text-right">{formatCurrency(Number(payment.amount))}</td>
+                    <td className={`text-right${isReversed ? ' invoice-document__amount-reversed' : ''}`}>
+                      {formatCurrency(Number(payment.amount))}
+                    </td>
                     <td>{payment.reference_num || '—'}</td>
+                    <td>{isReversed ? 'Reversed' : 'Posted'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </section>

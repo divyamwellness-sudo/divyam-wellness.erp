@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Ban, CreditCard, Download, Printer } from 'lucide-react';
+import { ArrowLeft, Ban, CreditCard, Download, Printer, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AddPaymentModal } from '@/features/billing/components/AddPaymentModal';
 import { CancelInvoiceModal } from '@/features/billing/components/CancelInvoiceModal';
+import { ReversePaymentModal } from '@/features/billing/components/ReversePaymentModal';
 import { InvoiceDocument } from '@/features/billing/components/InvoiceDocument';
 import { getInvoiceById } from '@/features/billing/services/invoice.service';
 import { getInvoicePdfFilename, paymentMethodLabels, sortInvoicePayments } from '@/features/billing/utils/invoiceDocument';
@@ -15,7 +16,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { getBusinessSettings } from '@/features/settings/services/settings.service';
 import { formatCurrency, formatVP } from '@/lib/utils/currency';
 import { formatDate } from '@/lib/utils/format';
-import type { CustomerType, InvoiceStatus, PaymentMethod, PricingTier } from '@/types/database.types';
+import type { CustomerType, InvoiceStatus, Payment, PaymentMethod, PricingTier } from '@/types/database.types';
 
 const statusStyles: Record<InvoiceStatus, string> = {
   created: 'bg-slate-100 text-slate-700',
@@ -66,6 +67,9 @@ export function InvoiceDetailsPage() {
   const documentRef = useRef<HTMLDivElement>(null);
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [reversePaymentTarget, setReversePaymentTarget] = useState<Payment | null>(null);
+  const [reverseToast, setReverseToast] = useState<string | null>(null);
+  const reverseToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelToast, setCancelToast] = useState<string | null>(null);
   const cancelToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,6 +130,9 @@ export function InvoiceDetailsPage() {
       if (cancelToastTimer.current) {
         clearTimeout(cancelToastTimer.current);
       }
+      if (reverseToastTimer.current) {
+        clearTimeout(reverseToastTimer.current);
+      }
     };
   }, []);
 
@@ -167,6 +174,7 @@ export function InvoiceDetailsPage() {
   const canAddPayment = due > 0 && invoice.status !== 'cancelled';
   const canCancelInvoice =
     invoice.status !== 'cancelled' && Number(invoice.paid_amount) === 0;
+  const canReversePayments = invoice.status !== 'cancelled';
   const payments = sortInvoicePayments(invoice.payments);
 
   return (
@@ -346,11 +354,25 @@ export function InvoiceDetailsPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                         Reference
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                        Status
+                      </th>
+                      {canReversePayments && (
+                        <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                          Actions
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
-                    {payments.map((payment) => (
-                      <tr key={payment.id} className="hover:bg-slate-50">
+                    {payments.map((payment) => {
+                      const isReversed = payment.status === 'REVERSED';
+
+                      return (
+                      <tr
+                        key={payment.id}
+                        className={isReversed ? 'bg-slate-50/80' : 'hover:bg-slate-50'}
+                      >
                         <td className="px-6 py-4 text-sm text-slate-700">
                           {formatDate(payment.payment_date)}
                         </td>
@@ -358,14 +380,44 @@ export function InvoiceDetailsPage() {
                           {paymentMethodLabels[payment.payment_method as PaymentMethod] ??
                             payment.payment_method}
                         </td>
-                        <td className="px-6 py-4 text-right text-sm font-medium text-slate-900">
+                        <td
+                          className={`px-6 py-4 text-right text-sm font-medium ${
+                            isReversed ? 'text-slate-400 line-through' : 'text-slate-900'
+                          }`}
+                        >
                           {formatCurrency(Number(payment.amount))}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-500">
                           {payment.reference_num || '—'}
                         </td>
+                        <td className="px-6 py-4">
+                          {isReversed ? (
+                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
+                              Reversed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
+                              Posted
+                            </span>
+                          )}
+                        </td>
+                        {canReversePayments && (
+                          <td className="px-6 py-4 text-right">
+                            {!isReversed && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setReversePaymentTarget(payment)}
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                                Reverse
+                              </Button>
+                            )}
+                          </td>
+                        )}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -456,6 +508,29 @@ export function InvoiceDetailsPage() {
         onClose={() => setIsCancelModalOpen(false)}
         onSuccess={handleCancelSuccess}
       />
+
+      {reversePaymentTarget && (
+        <ReversePaymentModal
+          payment={reversePaymentTarget}
+          invoiceId={invoice.id}
+          invoiceNumber={invoice.invoice_number}
+          isOpen={Boolean(reversePaymentTarget)}
+          onClose={() => setReversePaymentTarget(null)}
+          onSuccess={() => {
+            setReverseToast('Payment reversed successfully.');
+            if (reverseToastTimer.current) {
+              clearTimeout(reverseToastTimer.current);
+            }
+            reverseToastTimer.current = setTimeout(() => setReverseToast(null), 3000);
+          }}
+        />
+      )}
+
+      {reverseToast && (
+        <div className="fixed bottom-6 right-6 z-[60] rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+          {reverseToast}
+        </div>
+      )}
     </div>
   );
 }
