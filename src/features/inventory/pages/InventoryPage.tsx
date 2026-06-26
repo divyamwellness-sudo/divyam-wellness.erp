@@ -38,7 +38,11 @@ import {
 
 } from '@/features/inventory/services/inventory.service';
 
-import type { InventoryMovementType } from '@/features/inventory/types';
+import type {
+  InventoryMovementType,
+  StockBalanceRow,
+  StockLocation,
+} from '@/features/inventory/types';
 
 import { getProducts } from '@/features/products/services/product.service';
 
@@ -102,33 +106,175 @@ function formatCurrency(value: number): string {
 
 
 
-function filterBalancesBySearch<T extends { product: { name: string; sku: string } | null }>(
+// ---------------------------------------------------------------------------
 
-  rows: T[],
+// Overview V2 — one row per product, locations stacked vertically in one cell.
 
-  search: string,
+// Aggregation is presentation logic on top of the existing stock_balances
 
-): T[] {
+// query; no business logic or stock calculations are changed.
 
-  const normalized = search.trim().toLowerCase();
+// ---------------------------------------------------------------------------
 
-  if (!normalized) {
+type LocationQty = {
 
-    return rows;
+  location_id: string;
+
+  location_name: string;
+
+  quantity: number;
+
+  is_default: boolean;
+
+};
+
+
+
+type ProductOverviewRow = {
+
+  product_id: string;
+
+  product_name: string;
+
+  sku: string;
+
+  cost_price: number;
+
+  total_qty: number;
+
+  total_value: number;
+
+  locations: LocationQty[];
+
+};
+
+
+
+function aggregateBalancesByProduct(
+
+  balances: StockBalanceRow[],
+
+  activeLocations: StockLocation[],
+
+  locationFilter: string,
+
+): ProductOverviewRow[] {
+
+  // Which locations to render inside each product cell.
+
+  // - All Locations filter: every active location (default included, so the
+
+  //   Rule-1 highlight on the default location's 0 qty is always visible).
+
+  // - Single location filter: only the selected location (no duplicate rows).
+
+  const displayLocations = locationFilter
+
+    ? activeLocations.filter((loc) => loc.id === locationFilter)
+
+    : activeLocations;
+
+
+
+  const byProduct = new Map<string, StockBalanceRow[]>();
+
+  for (const row of balances) {
+
+    if (!row.product) continue;
+
+    const arr = byProduct.get(row.product_id) ?? [];
+
+    arr.push(row);
+
+    byProduct.set(row.product_id, arr);
 
   }
 
 
 
-  return rows.filter((row) => {
+  const rows: ProductOverviewRow[] = [];
 
-    const name = row.product?.name.toLowerCase() ?? '';
+  for (const [productId, productRows] of byProduct) {
 
-    const sku = row.product?.sku.toLowerCase() ?? '';
+    const product = productRows[0].product!;
 
-    return name.includes(normalized) || sku.includes(normalized);
+    const costPrice = Number(product.price_50 ?? 0);
 
-  });
+
+
+    const qtyByLocation = new Map<string, number>();
+
+    for (const row of productRows) {
+
+      qtyByLocation.set(row.location_id, row.quantity_on_hand);
+
+    }
+
+
+
+    const locations: LocationQty[] = displayLocations.map((loc) => ({
+
+      location_id: loc.id,
+
+      location_name: loc.name,
+
+      quantity: qtyByLocation.get(loc.id) ?? 0,
+
+      is_default: loc.is_default,
+
+    }));
+
+
+
+    const totalQty = locations.reduce((sum, l) => sum + l.quantity, 0);
+
+
+
+    rows.push({
+
+      product_id: productId,
+
+      product_name: product.name,
+
+      sku: product.sku,
+
+      cost_price: costPrice,
+
+      total_qty: totalQty,
+
+      total_value: totalQty * costPrice,
+
+      locations,
+
+    });
+
+  }
+
+
+
+  rows.sort((a, b) => a.product_name.localeCompare(b.product_name));
+
+  return rows;
+
+}
+
+
+
+function filterProductsBySearch(rows: ProductOverviewRow[], search: string): ProductOverviewRow[] {
+
+  const normalized = search.trim().toLowerCase();
+
+  if (!normalized) return rows;
+
+  return rows.filter(
+
+    (row) =>
+
+      row.product_name.toLowerCase().includes(normalized) ||
+
+      row.sku.toLowerCase().includes(normalized),
+
+  );
 
 }
 
@@ -302,11 +448,23 @@ export function InventoryPage() {
 
 
 
-  const filteredBalances = useMemo(
+  // Overview V2: collapse per-location balance rows into one row per product.
 
-    () => filterBalancesBySearch(balances, productSearch),
+  const productRows = useMemo(
 
-    [balances, productSearch],
+    () => aggregateBalancesByProduct(balances, activeLocations, locationFilter),
+
+    [balances, activeLocations, locationFilter],
+
+  );
+
+
+
+  const filteredProductRows = useMemo(
+
+    () => filterProductsBySearch(productRows, productSearch),
+
+    [productRows, productSearch],
 
   );
 
@@ -444,7 +602,7 @@ export function InventoryPage() {
 
               <div className="py-12 text-center text-slate-500">Loading stock balances...</div>
 
-            ) : filteredBalances.length === 0 ? (
+            ) : filteredProductRows.length === 0 ? (
 
               <div className="py-12 text-center text-slate-500">No stock matches your filters.</div>
 
@@ -460,7 +618,7 @@ export function InventoryPage() {
 
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
 
-                        Location
+                        SKU
 
                       </th>
 
@@ -472,25 +630,25 @@ export function InventoryPage() {
 
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
 
-                        SKU
+                        Locations
 
                       </th>
 
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
 
-                        Qty
+                        Cost Price
 
                       </th>
 
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
 
-                        Unit Cost
+                        Total Qty
 
                       </th>
 
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
 
-                        Value
+                        Total Value
 
                       </th>
 
@@ -500,41 +658,109 @@ export function InventoryPage() {
 
                   <tbody className="divide-y divide-slate-200 bg-white">
 
-                    {filteredBalances.map((row) => {
+                    {filteredProductRows.map((row) => {
 
-                      const unitCost = Number(row.product?.price_50 ?? 0);
+                      // Rule 2: total qty across all (displayed) locations is 0
 
-                      const lineValue = row.quantity_on_hand * unitCost;
+                      // → light red background on the entire row, still readable.
+
+                      const totalIsZero = row.total_qty === 0;
+
+                      // Rule 1: default location qty is 0 AND total > 0
+
+                      // → highlight ONLY that quantity cell (solid red, white text).
+
+                      const defaultZeroCell = row.locations.find(
+
+                        (loc) => loc.is_default && loc.quantity === 0 && row.total_qty > 0,
+
+                      );
 
                       return (
 
-                        <tr key={row.id} className="hover:bg-slate-50">
+                        <tr
 
-                          <td className="px-4 py-3 text-sm text-slate-700">{row.location?.name ?? '—'}</td>
+                          key={row.product_id}
+
+                          className={
+
+                            totalIsZero
+
+                              ? 'bg-red-50 hover:bg-red-100'
+
+                              : 'hover:bg-slate-50'
+
+                          }
+
+                        >
+
+                          <td className="px-4 py-3 text-sm text-slate-500">{row.sku || '—'}</td>
 
                           <td className="px-4 py-3 text-sm font-medium text-slate-900">
 
-                            {row.product?.name ?? '—'}
+                            {row.product_name}
 
                           </td>
 
-                          <td className="px-4 py-3 text-sm text-slate-500">{row.product?.sku ?? '—'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">
 
-                          <td className="px-4 py-3 text-right text-sm text-slate-900">
+                            <div className="flex flex-col gap-1.5">
 
-                            {row.quantity_on_hand}
+                              {row.locations.map((loc) => {
+
+                                const highlightCell =
+
+                                  defaultZeroCell?.location_id === loc.location_id;
+
+                                return (
+
+                                  <div key={loc.location_id} className="flex flex-col">
+
+                                    <span className="text-slate-600">{loc.location_name}</span>
+
+                                    <span
+
+                                      className={
+
+                                        highlightCell
+
+                                          ? 'inline-block w-fit rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white'
+
+                                          : 'text-slate-900'
+
+                                      }
+
+                                    >
+
+                                      {loc.quantity.toLocaleString('en-IN')}
+
+                                    </span>
+
+                                  </div>
+
+                                );
+
+                              })}
+
+                            </div>
 
                           </td>
 
                           <td className="px-4 py-3 text-right text-sm text-slate-700">
 
-                            {formatCurrency(unitCost)}
+                            {formatCurrency(row.cost_price)}
+
+                          </td>
+
+                          <td className="px-4 py-3 text-right text-sm text-slate-900">
+
+                            {row.total_qty.toLocaleString('en-IN')}
 
                           </td>
 
                           <td className="px-4 py-3 text-right text-sm font-medium text-slate-900">
 
-                            {formatCurrency(lineValue)}
+                            {formatCurrency(row.total_value)}
 
                           </td>
 
