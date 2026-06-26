@@ -34,6 +34,14 @@ export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'card';
 
 export type PaymentStatus = 'POSTED' | 'REVERSED';
 
+export type QuotationStatus =
+  | 'draft'
+  | 'sent'
+  | 'accepted'
+  | 'rejected'
+  | 'expired'
+  | 'converted';
+
 /**
  * Maps a pricing tier to the product price column that holds its price.
  * Single source of truth shared by the catalog UI and the future Billing module.
@@ -91,6 +99,8 @@ export type Database = {
           logo_url: string | null;
           invoice_prefix: string;
           next_invoice_number: number;
+          quotation_prefix: string;
+          next_quotation_number: number;
           currency: string;
           updated_at: string;
         };
@@ -105,6 +115,8 @@ export type Database = {
           logo_url?: string | null;
           invoice_prefix?: string;
           next_invoice_number?: number;
+          quotation_prefix?: string;
+          next_quotation_number?: number;
           currency?: string;
           updated_at?: string;
         };
@@ -119,6 +131,8 @@ export type Database = {
           logo_url?: string | null;
           invoice_prefix?: string;
           next_invoice_number?: number;
+          quotation_prefix?: string;
+          next_quotation_number?: number;
           currency?: string;
           updated_at?: string;
         };
@@ -500,6 +514,151 @@ export type Database = {
           },
         ];
       };
+      quotations: {
+        Row: {
+          id: string;
+          quotation_number: string;
+          customer_id: string;
+          customer_type: CustomerType;
+          pricing_tier: PricingTier;
+          stock_location_id: string;
+          subtotal: number;
+          total_vp: number;
+          tax_amount: number;
+          total_amount: number;
+          status: QuotationStatus;
+          quotation_date: string;
+          valid_until: string;
+          notes: string | null;
+          terms: string | null;
+          converted_invoice_id: string | null;
+          converted_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quotation_number?: string;
+          customer_id: string;
+          customer_type: CustomerType;
+          pricing_tier: PricingTier;
+          stock_location_id: string;
+          subtotal?: number;
+          total_vp?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          status?: QuotationStatus;
+          quotation_date?: string;
+          valid_until?: string;
+          notes?: string | null;
+          terms?: string | null;
+          converted_invoice_id?: string | null;
+          converted_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          quotation_number?: string;
+          customer_id?: string;
+          customer_type?: CustomerType;
+          pricing_tier?: PricingTier;
+          stock_location_id?: string;
+          subtotal?: number;
+          total_vp?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          status?: QuotationStatus;
+          quotation_date?: string;
+          valid_until?: string;
+          notes?: string | null;
+          terms?: string | null;
+          converted_invoice_id?: string | null;
+          converted_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'quotations_customer_id_fkey';
+            columns: ['customer_id'];
+            referencedRelation: 'customers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'quotations_stock_location_id_fkey';
+            columns: ['stock_location_id'];
+            referencedRelation: 'stock_locations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'quotations_converted_invoice_id_fkey';
+            columns: ['converted_invoice_id'];
+            referencedRelation: 'invoices';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'quotations_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      quotation_items: {
+        Row: {
+          id: string;
+          quotation_id: string;
+          product_id: string | null;
+          product_name: string;
+          product_sku: string;
+          unit_price: number;
+          unit_vp: number;
+          quantity: number;
+          line_total: number;
+          line_vp: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          quotation_id: string;
+          product_id?: string | null;
+          product_name: string;
+          product_sku: string;
+          unit_price: number;
+          unit_vp?: number;
+          quantity: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          quotation_id?: string;
+          product_id?: string | null;
+          product_name?: string;
+          product_sku?: string;
+          unit_price?: number;
+          unit_vp?: number;
+          quantity?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'quotation_items_quotation_id_fkey';
+            columns: ['quotation_id'];
+            referencedRelation: 'quotations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'quotation_items_product_id_fkey';
+            columns: ['product_id'];
+            referencedRelation: 'products';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       payment_reversals: {
         Row: {
           id: string;
@@ -647,6 +806,14 @@ export type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
 export type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
 
 export type PaymentReversal = Database['public']['Tables']['payment_reversals']['Row'];
+
+export type Quotation = Database['public']['Tables']['quotations']['Row'];
+export type QuotationInsert = Database['public']['Tables']['quotations']['Insert'];
+export type QuotationUpdate = Database['public']['Tables']['quotations']['Update'];
+
+export type QuotationItem = Database['public']['Tables']['quotation_items']['Row'];
+export type QuotationItemInsert = Database['public']['Tables']['quotation_items']['Insert'];
+export type QuotationItemUpdate = Database['public']['Tables']['quotation_items']['Update'];
 
 /** Resolves the price of a product for a given pricing tier. */
 export function resolveProductPrice(product: Product, tier: PricingTier): number {

@@ -1,7 +1,8 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Leaf, LogOut, X } from 'lucide-react';
 import { APP_NAME } from '@/config/branding';
-import { navigation } from '@/config/navigation';
+import { navigation, NavCaretIcon } from '@/config/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/format';
@@ -13,6 +14,16 @@ type SidebarProps = {
 
 export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
   const { signOut, profile, businessSettings } = useAuth();
+  const location = useLocation();
+
+  // Expand parent groups whose child route is active. Default: Billing open.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Billing: true,
+  });
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
 
   return (
     <aside
@@ -21,7 +32,7 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       )}
     >
-          <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
+      <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
         {businessSettings?.logo_url ? (
           <img
             src={businessSettings.logo_url}
@@ -53,24 +64,81 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
         {navigation.map((item) => {
           const Icon = item.icon;
 
+          if (!item.children) {
+            return (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                end={item.end}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                  )
+                }
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </NavLink>
+            );
+          }
+
+          const isGroupActive = location.pathname.startsWith(item.href);
+          const isOpen = openGroups[item.label] ?? isGroupActive;
+
           return (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              end={item.end}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
+            <div key={item.href} className="space-y-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup(item.label)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isGroupActive
                     ? 'bg-brand-50 text-brand-700'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-                )
-              }
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </NavLink>
+                )}
+                aria-expanded={isOpen}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">{item.label}</span>
+                <NavCaretIcon
+                  className={cn(
+                    'h-4 w-4 shrink-0 text-slate-400 transition-transform',
+                    isOpen && 'rotate-180',
+                  )}
+                />
+              </button>
+
+              {isOpen && (
+                <div className="ml-4 space-y-1 border-l border-slate-200 pl-3">
+                  {item.children.map((child) => {
+                    const ChildIcon = child.icon;
+                    return (
+                      <NavLink
+                        key={child.href}
+                        to={child.href}
+                        end={child.end}
+                        onClick={onNavigate}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-brand-50 text-brand-700'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                          )
+                        }
+                      >
+                        <ChildIcon className="h-4 w-4 shrink-0" />
+                        {child.label}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>

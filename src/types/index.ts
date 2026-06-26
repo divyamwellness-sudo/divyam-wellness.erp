@@ -18,6 +18,14 @@ export type {
   PricingTier,
   CustomerStatus,
   ProductCategory,
+  InvoiceStatus,
+  Quotation,
+  QuotationInsert,
+  QuotationUpdate,
+  QuotationItem,
+  QuotationItemInsert,
+  QuotationItemUpdate,
+  QuotationStatus,
 } from './database.types';
 
 export {

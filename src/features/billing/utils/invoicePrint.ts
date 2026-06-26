@@ -1,30 +1,12 @@
-import { useCallback, type RefObject } from 'react';
-import { useReactToPrint } from 'react-to-print';
+import { useDocumentPrint } from '@/features/billing/utils/documentPrint';
 
-const printPageStyle = `
-  @page {
-    size: A4;
-    margin: 12mm;
-  }
-  @media print {
-    body {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-  }
-`;
-
+/**
+ * Backwards-compatible wrapper kept for the invoice print pipeline.
+ * New code should prefer the shared `useDocumentPrint` hook directly.
+ */
 export function useInvoicePrint(
-  contentRef: RefObject<HTMLDivElement | null>,
+  contentRef: React.RefObject<HTMLDivElement | null>,
   documentTitle: string,
 ) {
-  const print = useReactToPrint({
-    contentRef,
-    documentTitle,
-    pageStyle: printPageStyle,
-  });
-
-  return useCallback(() => {
-    print();
-  }, [print]);
+  return useDocumentPrint(contentRef, documentTitle);
 }
