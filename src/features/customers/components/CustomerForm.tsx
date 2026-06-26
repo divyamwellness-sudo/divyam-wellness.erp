@@ -20,9 +20,23 @@ const customerFormSchema = z
     date_of_birth: z.string().optional(),
     city: z.string().optional(),
     joining_date: z.string().min(1, 'Joining date is required'),
-    height_cm: z.number().min(50, 'Height must be at least 50 cm').max(250, 'Height must be at most 250 cm').optional(),
-    starting_weight: z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
-    target_weight: z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
+    // Height / Starting Weight / Target Weight are OPTIONAL. They use
+    // `valueAsNumber: true` in register(), which yields NaN for an empty
+    // input — preprocess converts NaN/empty back to undefined so the
+    // `.optional()` actually applies and the min/max range checks only run
+    // when a real value was entered.
+    height_cm: z.preprocess(
+      (val) => (val == null || val === '' || Number.isNaN(val) ? undefined : val),
+      z.number().min(50, 'Height must be at least 50 cm').max(250, 'Height must be at most 250 cm').optional(),
+    ),
+    starting_weight: z.preprocess(
+      (val) => (val == null || val === '' || Number.isNaN(val) ? undefined : val),
+      z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
+    ),
+    target_weight: z.preprocess(
+      (val) => (val == null || val === '' || Number.isNaN(val) ? undefined : val),
+      z.number().min(20, 'Weight must be at least 20 kg').max(300, 'Weight must be at most 300 kg').optional(),
+    ),
     goal: z.enum(['weight_loss', 'weight_gain', 'maintenance', 'muscle_gain', 'general_wellness'] as const).optional(),
     customer_type: z.enum(['pc', 'coach'] as const),
     pricing_tier: z.enum(['MRP', '15', '25', '35', '42', '50'] as const),
