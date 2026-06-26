@@ -198,3 +198,241 @@ export async function deletePayment(id: string): Promise<void> {
     handleSupabaseError(error, 'deletePayment');
   }
 }
+
+// ===========================================================================
+// Payment ledger — cross-invoice view of POSTED payments.
+// Reversed payments are excluded (the Invoice Details page shows full history).
+// ===========================================================================
+
+export type PaymentLedgerFilters = {
+  search?: string;
+  customerId?: string;
+  paymentMethod?: PaymentMethod | 'all';
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type PaymentLedgerRow = {
+  id: string;
+  amount: number;
+  payment_method: PaymentMethod;
+  payment_date: string;
+  reference_num: string | null;
+  notes: string | null;
+  status: 'POSTED' | 'REVERSED';
+  created_at: string;
+  invoice_id: string;
+  invoice_number: string;
+  invoice_total: number;
+  invoice_paid: number;
+  invoice_due: number;
+  invoice_status: 'created' | 'partial' | 'paid' | 'cancelled';
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+};
+
+export type PaymentLedgerResponse = {
+  payments: PaymentLedgerRow[];
+  totalCount: number;
+};
+
+type LedgerQueryRow = {
+  id: string;
+  amount: number;
+  payment_method: PaymentMethod;
+  payment_date: string;
+  reference_num: string | null;
+  notes: string | null;
+  status: 'POSTED' | 'REVERSED';
+  created_at: string;
+  invoice: {
+    id: string;
+    invoice_number: string;
+    total_amount: number;
+    paid_amount: number;
+    due_amount: number;
+    status: 'created' | 'partial' | 'paid' | 'cancelled';
+    customer_id: string;
+    customer: { id: string; name: string; phone: string } | null;
+  } | null;
+};
+
+const ledgerSelect = `
+  *,
+  invoice:invoices(
+    id,
+    invoice_number,
+    total_amount,
+    paid_amount,
+    due_amount,
+    status,
+    customer_id,
+    customer:customers(id, name, phone)
+  )
+`;
+
+function mapLedgerRow(row: LedgerQueryRow): PaymentLedgerRow {
+  const invoice = row.invoice;
+  return {
+    id: row.id,
+    amount: Number(row.amount),
+    payment_method: row.payment_method,
+    payment_date: row.payment_date,
+    reference_num: row.reference_num,
+    notes: row.notes,
+    status: row.status,
+    created_at: row.created_at,
+    invoice_id: invoice?.id ?? '',
+    invoice_number: invoice?.invoice_number ?? '—',
+    invoice_total: Number(invoice?.total_amount ?? 0),
+    invoice_paid: Number(invoice?.paid_amount ?? 0),
+    invoice_due: Number(invoice?.due_amount ?? 0),
+    invoice_status: invoice?.status ?? 'created',
+    customer_id: invoice?.customer_id ?? invoice?.customer?.id ?? '',
+    customer_name: invoice?.customer?.name ?? '—',
+    customer_phone: invoice?.customer?.phone ?? '—',
+  };
+}
+
+export async function getPaymentLedger(
+  filters: PaymentLedgerFilters = {},
+): Promise<PaymentLedgerResponse> {
+  try {
+    let query = supabase
+      .from('payments')
+      .select(ledgerSelect)
+      // Only POSTED payments belong on the operational ledger.
+      .eq('status', 'POSTED')
+      .order('payment_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (filters.paymentMethod && filters.paymentMethod !== 'all') {
+      query = query.eq('payment_method', filters.paymentMethod);
+    }
+
+    if (filters.dateFrom) {
+      query = query.gte('payment_date', filters.dateFrom);
+    }
+
+    if (filters.dateTo) {
+      query = query.lte('payment_date', filters.dateTo);
+    }
+
+    if (filters.customerId) {
+      // Filter through the joined invoice -> customer relationship.
+      query = query.eq('invoice.customer_id', filters.customerId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      handleSupabaseError(error, 'getPaymentLedger');
+    }
+
+    let rows = ((data ?? []) as unknown as LedgerQueryRow[]).map(mapLedgerRow);
+
+    // Client-side text search across customer name, invoice number, amount
+    // and outstanding due. Supabase cannot OR-search across joined columns +
+    // numeric equality in a single ilike, so we filter in memory after fetch.
+    const search = filters.search?.trim();
+    if (search) {
+      const numericQuery = Number(search.replace(/[^0-9.]/g, ''));
+      const lower = search.toLowerCase();
+      rows = rows.filter((row) => {
+        if (row.customer_name.toLowerCase().includes(lower)) return true;
+        if (row.invoice_number.toLowerCase().includes(lower)) return true;
+        if (numericQuery > 0) {
+          if (Math.abs(row.amount - numericQuery) < 0.001) return true;
+          if (Math.abs(row.invoice_total - numericQuery) < 0.001) return true;
+          if (Math.abs(row.invoice_due - numericQuery) < 0.001) return true;
+        }
+        return false;
+      });
+    }
+
+    return {
+      payments: rows,
+      totalCount: rows.length,
+    };
+  } catch (error) {
+    if (error instanceof PaymentServiceError) {
+      throw error;
+    }
+    handleSupabaseError(error, 'getPaymentLedger');
+  }
+}
+
+// ===========================================================================
+// Collectable invoices — created/partial invoices for a customer, used by the
+// Record Payment modal's invoice picker. Paid/cancelled are never shown.
+// ===========================================================================
+
+export type CollectableInvoice = {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  due_amount: number;
+  status: 'created' | 'partial';
+  customer_id: string;
+  customer_name: string;
+};
+
+export async function getCollectableInvoices(
+  customerId: string,
+): Promise<CollectableInvoice[]> {
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(
+        `
+        id,
+        invoice_number,
+        invoice_date,
+        total_amount,
+        paid_amount,
+        due_amount,
+        status,
+        customer_id,
+        customer:customers(id, name)
+      `,
+      )
+      .eq('customer_id', customerId)
+      .in('status', ['created', 'partial'])
+      .order('invoice_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      handleSupabaseError(error, 'getCollectableInvoices');
+    }
+
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      invoice_number: string;
+      invoice_date: string;
+      total_amount: number;
+      paid_amount: number;
+      due_amount: number;
+      status: 'created' | 'partial';
+      customer_id: string;
+      customer: { id: string; name: string } | null;
+    }>).map((row) => ({
+      id: row.id,
+      invoice_number: row.invoice_number,
+      invoice_date: row.invoice_date,
+      total_amount: Number(row.total_amount),
+      paid_amount: Number(row.paid_amount),
+      due_amount: Number(row.due_amount),
+      status: row.status,
+      customer_id: row.customer_id,
+      customer_name: row.customer?.name ?? '—',
+    }));
+  } catch (error) {
+    if (error instanceof PaymentServiceError) {
+      throw error;
+    }
+    handleSupabaseError(error, 'getCollectableInvoices');
+  }
+}
