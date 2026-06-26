@@ -140,14 +140,12 @@ function Select({
 
 function QuotationRowActions({
   quotation,
-  customerLabel,
   onView,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
   quotation: Quotation;
-  customerLabel: { name: string; phone: string } | null;
   onView: (quotation: Quotation) => void;
   onEdit: (quotation: Quotation) => void;
   onDuplicate: (quotation: Quotation) => void;
@@ -312,7 +310,6 @@ function QuotationTable({
                   <td className="px-6 py-4 text-right">
                     <QuotationRowActions
                       quotation={quotation}
-                      customerLabel={customer}
                       onView={onView}
                       onEdit={onEdit}
                       onDuplicate={onDuplicate}
