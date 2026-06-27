@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +8,15 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { CustomerCombobox } from '@/features/customers/components/CustomerCombobox';
+import { ProgressReportDocument } from '@/features/customers/components/ProgressReportDocument';
+import { buildProgressAnalytics } from '@/features/customers/utils/progressAnalytics';
+import { downloadProgressReportPdf } from '@/features/customers/utils/progressReportPdf';
+import { getProgressReportPdfFilename } from '@/features/customers/utils/progressReportDocument';
+import { exportToExcel } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
 import { calculateAge, toDateInputValue, toLocalDateInputValue } from '@/lib/utils/format';
 import {
   getWeightLogs,
@@ -605,9 +613,11 @@ function WeightLogTable({
 }
 
 export function WeightTrackingPage() {
+  const { businessSettings, profile } = useAuth();
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [formMode, setFormMode] = useState<WeightLogFormMode>(null);
   const [selectedWeightLog, setSelectedWeightLog] = useState<WeightLog | null>(null);
+  const progressReportRef = useRef<HTMLDivElement>(null);
 
   const queryClient = useQueryClient();
 
@@ -690,6 +700,71 @@ export function WeightTrackingPage() {
   const customers = customersData?.customers || [];
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
+  // --- Export wiring (per-customer wellness report — the ERP's flagship PDF) ---
+  const sortedWeightLogs = useMemo(
+    () => [...(weightLogs || [])].sort((a, b) => a.recorded_date.localeCompare(b.recorded_date)),
+    [weightLogs],
+  );
+
+  const progressAnalytics = useMemo(
+    () =>
+      selectedCustomer && sortedWeightLogs.length > 0
+        ? buildProgressAnalytics(sortedWeightLogs, selectedCustomer)
+        : null,
+    [selectedCustomer, sortedWeightLogs],
+  );
+
+  const canExportWeightReport = Boolean(
+    selectedCustomer && progressAnalytics && sortedWeightLogs.length > 0 && businessSettings,
+  );
+
+  const weightLogExportColumns: ExportColumn[] = [
+    { key: 'date', header: 'Date', type: 'date' },
+    { key: 'weight', header: 'Weight (kg)', type: 'number' },
+    { key: 'change', header: 'Change From Previous (kg)', type: 'number' },
+    { key: 'totalChange', header: 'Total Change (kg)', type: 'number' },
+    { key: 'bmi', header: 'BMI', type: 'number' },
+  ];
+
+  const buildWeightLogExportRows = (): ExportRow[] => {
+    if (!sortedWeightLogs.length) return [];
+    const startingWeight = sortedWeightLogs[0].weight_kg;
+    let previousWeight: number | null = null;
+    return sortedWeightLogs.map((log) => {
+      const change = previousWeight == null ? '' : Number(log.weight_kg) - previousWeight;
+      previousWeight = Number(log.weight_kg);
+      return {
+        date: formatDate(log.recorded_date),
+        weight: Number(log.weight_kg),
+        change,
+        totalChange: Number(log.weight_kg) - startingWeight,
+        bmi: log.bmi ?? '',
+      };
+    });
+  };
+
+  const handleExportWeightExcel = () => {
+    if (!selectedCustomer || sortedWeightLogs.length === 0) return;
+    void exportToExcel({
+      title: 'Weight Progress Report',
+      subtitle: `Customer: ${selectedCustomer.name}`,
+      worksheetName: 'Weight Logs',
+      filename: `${selectedCustomer.name.replace(/\s+/g, '-').toLowerCase()}-weight-logs`,
+      columns: weightLogExportColumns,
+      rows: buildWeightLogExportRows(),
+      businessSettings,
+      generatedBy: profile?.full_name,
+    });
+  };
+
+  const handleExportWeightPdf = async () => {
+    if (!progressReportRef.current || !selectedCustomer) return;
+    await downloadProgressReportPdf(
+      progressReportRef.current,
+      getProgressReportPdfFilename(selectedCustomer.name),
+    );
+  };
+
   const getMutationErrorMessage = () => {
     if (addMutation.error instanceof Error) return addMutation.error.message;
     if (updateMutation.error instanceof Error) return updateMutation.error.message;
@@ -702,6 +777,13 @@ export function WeightTrackingPage() {
       <PageHeader
         title="Weight Tracking"
         description="Monitor customer weight progress and body composition over time."
+        action={
+          <ExportDropdown
+            onExportExcel={handleExportWeightExcel}
+            onExportPdf={handleExportWeightPdf}
+            disabled={!canExportWeightReport}
+          />
+        }
       />
 
       {(addMutation.error || updateMutation.error || deleteMutation.error) && (
@@ -798,6 +880,18 @@ export function WeightTrackingPage() {
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <Scale className="mx-auto h-12 w-12 text-slate-400" />
           <p className="mt-4 text-slate-500">Select a customer to start tracking their weight progress.</p>
+        </div>
+      )}
+
+      {canExportWeightReport && selectedCustomer && progressAnalytics && businessSettings && (
+        <div className="fixed left-[-9999px] top-0 -z-50 overflow-hidden" aria-hidden="true">
+          <ProgressReportDocument
+            ref={progressReportRef}
+            customer={selectedCustomer}
+            analytics={progressAnalytics}
+            weightLogs={sortedWeightLogs}
+            businessSettings={businessSettings}
+          />
         </div>
       )}
     </div>

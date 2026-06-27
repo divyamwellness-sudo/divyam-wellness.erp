@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
-import { calculateAge } from '@/lib/utils/format';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
+import { calculateAge, formatDate } from '@/lib/utils/format';
 import { CustomerForm } from '@/features/customers/components/CustomerForm';
 import {
   getCustomers,
@@ -262,6 +266,7 @@ function CustomerTable({
 
 export function CustomersPage() {
   const navigate = useNavigate();
+  const { businessSettings, profile } = useAuth();
   const [formMode, setFormMode] = useState<CustomerFormMode>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -363,6 +368,47 @@ export function CustomersPage() {
   const listError = isSearchActive ? searchError : customersError;
   const refetchList = isSearchActive ? refetchSearch : refetchCustomers;
 
+  // --- Export wiring (respects current search + filters) ---
+  const customerExportColumns: ExportColumn[] = [
+    { key: 'name', header: 'Name', type: 'text' },
+    { key: 'phone', header: 'Phone', type: 'text' },
+    { key: 'customerType', header: 'Customer Type', type: 'text' },
+    { key: 'pricingTier', header: 'Pricing Tier', type: 'text' },
+    { key: 'joinDate', header: 'Join Date', type: 'date' },
+    { key: 'currentWeight', header: 'Current Weight (kg)', type: 'number' },
+  ];
+
+  const buildCustomerExportRows = (): ExportRow[] =>
+    displayedCustomers.map((c) => ({
+      name: c.name,
+      phone: c.phone,
+      customerType: c.customer_type === 'coach' ? 'Coach' : 'PC',
+      pricingTier: c.pricing_tier === 'MRP' ? 'MRP' : `${c.pricing_tier}%`,
+      joinDate: formatDate(c.joining_date),
+      currentWeight: c.current_weight ?? '',
+    }));
+
+  const customerExportBase = {
+    title: 'Customers Report',
+    worksheetName: 'Customers',
+    filename: `customers-${new Date().toISOString().slice(0, 10)}`,
+    columns: customerExportColumns,
+    businessSettings,
+    generatedBy: profile?.full_name,
+  };
+
+  const handleExportCustomersExcel = () =>
+    exportToExcel({
+      ...customerExportBase,
+      rows: buildCustomerExportRows(),
+    });
+
+  const handleExportCustomersPdf = () =>
+    exportToPdfReport({
+      ...customerExportBase,
+      rows: buildCustomerExportRows(),
+    });
+
   const getMutationErrorMessage = () => {
     if (createMutation.error instanceof Error) return createMutation.error.message;
     if (updateMutation.error instanceof Error) return updateMutation.error.message;
@@ -397,10 +443,17 @@ export function CustomersPage() {
         title="Customers"
         description="Manage your wellness program customers and their information."
         action={
-          <Button onClick={() => setFormMode('create')}>
-            <Plus className="h-4 w-4" />
-            Add Customer
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportDropdown
+              onExportExcel={handleExportCustomersExcel}
+              onExportPdf={handleExportCustomersPdf}
+              disabled={displayedCustomers.length === 0}
+            />
+            <Button onClick={() => setFormMode('create')}>
+              <Plus className="h-4 w-4" />
+              Add Customer
+            </Button>
+          </div>
         }
       />
 

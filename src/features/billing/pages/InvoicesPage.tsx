@@ -15,6 +15,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
 import { getInvoices, type InvoiceFilters } from '@/features/billing/services/invoice.service';
 import { getCustomers } from '@/features/customers/services/customer.service';
 import type { Invoice, InvoiceStatus } from '@/types/database.types';
@@ -210,6 +214,7 @@ function InvoiceTable({
 
 export function InvoicesPage() {
   const navigate = useNavigate();
+  const { businessSettings, profile } = useAuth();
 
   const [filters, setFilters] = useState<InvoiceFilters>({
     status: 'all',
@@ -244,6 +249,44 @@ export function InvoicesPage() {
     const customer = customers.find((c) => c.id === customerId);
     return customer ? { name: customer.name, phone: customer.phone } : null;
   };
+
+  // --- Export wiring (respects current search + status/customer filters) ---
+  const customerNameFor = (customerId: string): string =>
+    customers.find((c) => c.id === customerId)?.name ?? '—';
+
+  const invoiceExportColumns: ExportColumn[] = [
+    { key: 'invoiceNumber', header: 'Invoice Number', type: 'text' },
+    { key: 'customer', header: 'Customer', type: 'text' },
+    { key: 'status', header: 'Status', type: 'text' },
+    { key: 'grandTotal', header: 'Grand Total', type: 'currency' },
+    { key: 'paid', header: 'Paid', type: 'currency' },
+    { key: 'due', header: 'Due', type: 'currency' },
+  ];
+
+  const buildInvoiceExportRows = (): ExportRow[] =>
+    invoices.map((inv) => ({
+      invoiceNumber: inv.invoice_number,
+      customer: customerNameFor(inv.customer_id),
+      status: statusLabels[inv.status],
+      grandTotal: Number(inv.total_amount),
+      paid: Number(inv.paid_amount),
+      due: Number(inv.due_amount),
+    }));
+
+  const invoiceExportBase = {
+    title: 'Invoices Report',
+    worksheetName: 'Invoices',
+    filename: `invoices-${new Date().toISOString().slice(0, 10)}`,
+    columns: invoiceExportColumns,
+    businessSettings,
+    generatedBy: profile?.full_name,
+    orientation: 'landscape' as const,
+  };
+
+  const handleExportInvoicesExcel = () =>
+    exportToExcel({ ...invoiceExportBase, rows: buildInvoiceExportRows() });
+  const handleExportInvoicesPdf = () =>
+    exportToPdfReport({ ...invoiceExportBase, rows: buildInvoiceExportRows() });
 
   const customerFilterOptions = [
     { value: '', label: 'All Customers' },
@@ -280,10 +323,17 @@ export function InvoicesPage() {
         title="Invoices"
         description="View and manage customer invoices, payments and due balances."
         action={
-          <Button onClick={handleCreateInvoice}>
-            <Plus className="h-4 w-4" />
-            Create Invoice
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportDropdown
+              onExportExcel={handleExportInvoicesExcel}
+              onExportPdf={handleExportInvoicesPdf}
+              disabled={invoices.length === 0}
+            />
+            <Button onClick={handleCreateInvoice}>
+              <Plus className="h-4 w-4" />
+              Create Invoice
+            </Button>
+          </div>
         }
       />
 

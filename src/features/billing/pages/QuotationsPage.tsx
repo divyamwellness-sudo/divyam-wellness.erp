@@ -17,6 +17,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
 import {
   deleteQuotation,
   duplicateQuotation,
@@ -328,6 +332,7 @@ function QuotationTable({
 
 export function QuotationsPage() {
   const navigate = useNavigate();
+  const { businessSettings, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<QuotationFilters>({
@@ -356,6 +361,41 @@ export function QuotationsPage() {
     const customer = customers.find((c) => c.id === customerId);
     return customer ? { name: customer.name, phone: customer.phone } : null;
   };
+
+  // --- Export wiring (respects current search + status/customer filters) ---
+  const customerNameFor = (customerId: string): string =>
+    customers.find((c) => c.id === customerId)?.name ?? '—';
+
+  const quotationExportColumns: ExportColumn[] = [
+    { key: 'quotationNumber', header: 'Quotation Number', type: 'text' },
+    { key: 'customer', header: 'Customer', type: 'text' },
+    { key: 'status', header: 'Status', type: 'text' },
+    { key: 'amount', header: 'Amount', type: 'currency' },
+    { key: 'validUntil', header: 'Valid Until', type: 'date' },
+  ];
+
+  const buildQuotationExportRows = (): ExportRow[] =>
+    quotations.map((q) => ({
+      quotationNumber: q.quotation_number,
+      customer: customerNameFor(q.customer_id),
+      status: statusLabels[q.status],
+      amount: Number(q.total_amount),
+      validUntil: q.valid_until ? formatDate(q.valid_until) : '',
+    }));
+
+  const quotationExportBase = {
+    title: 'Quotations Report',
+    worksheetName: 'Quotations',
+    filename: `quotations-${new Date().toISOString().slice(0, 10)}`,
+    columns: quotationExportColumns,
+    businessSettings,
+    generatedBy: profile?.full_name,
+  };
+
+  const handleExportQuotationsExcel = () =>
+    exportToExcel({ ...quotationExportBase, rows: buildQuotationExportRows() });
+  const handleExportQuotationsPdf = () =>
+    exportToPdfReport({ ...quotationExportBase, rows: buildQuotationExportRows() });
 
   const customerFilterOptions = [
     { value: '', label: 'All Customers' },
@@ -436,10 +476,17 @@ export function QuotationsPage() {
         title="Quotations"
         description="Create and manage customer quotations. Convert accepted quotations into invoices in one click."
         action={
-          <Button onClick={() => navigate('/billing/quotations/new')}>
-            <Plus className="h-4 w-4" />
-            Create Quotation
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportDropdown
+              onExportExcel={handleExportQuotationsExcel}
+              onExportPdf={handleExportQuotationsPdf}
+              disabled={quotations.length === 0}
+            />
+            <Button onClick={() => navigate('/billing/quotations/new')}>
+              <Plus className="h-4 w-4" />
+              Create Quotation
+            </Button>
+          </div>
         }
       />
 

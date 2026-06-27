@@ -8,6 +8,14 @@ import { PageHeader } from '@/components/layout/PageHeader';
 
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
 
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+
+import { useAuth } from '@/features/auth/hooks/useAuth';
+
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+
+import type { ExportColumn, ExportRow } from '@/lib/export';
+
 import { Input } from '@/components/ui/Input';
 
 import { LocationManagement } from '@/features/inventory/components/LocationManagement';
@@ -282,6 +290,8 @@ function filterProductsBySearch(rows: ProductOverviewRow[], search: string): Pro
 
 export function InventoryPage() {
 
+  const { businessSettings, profile } = useAuth();
+
   const [activeTab, setActiveTab] = useState<InventoryTab>('overview');
 
   const [locationFilter, setLocationFilter] = useState('');
@@ -470,6 +480,80 @@ export function InventoryPage() {
 
 
 
+  // --- Export wiring (Overview report — respects current search + location filter) ---
+
+  const inventoryExportColumns: ExportColumn[] = [
+
+    { key: 'sku', header: 'SKU', type: 'text' },
+
+    { key: 'product', header: 'Product', type: 'text' },
+
+    { key: 'locations', header: 'Locations', type: 'text', width: 60 },
+
+    { key: 'totalQty', header: 'Total Qty', type: 'number' },
+
+    { key: 'costPrice', header: 'Cost Price', type: 'currency' },
+
+    { key: 'totalValue', header: 'Total Value', type: 'currency' },
+
+  ];
+
+
+
+  const buildInventoryExportRows = (): ExportRow[] =>
+
+    filteredProductRows.map((row) => ({
+
+      sku: row.sku,
+
+      product: row.product_name,
+
+      locations: row.locations
+
+        .map((l) => `${l.location_name}: ${l.quantity}`)
+
+        .join('\n'),
+
+      totalQty: row.total_qty,
+
+      costPrice: row.cost_price,
+
+      totalValue: row.total_value,
+
+    }));
+
+
+
+  const inventoryExportBase = {
+
+    title: 'Inventory Report',
+
+    worksheetName: 'Inventory',
+
+    filename: `inventory-${new Date().toISOString().slice(0, 10)}`,
+
+    columns: inventoryExportColumns,
+
+    businessSettings,
+
+    generatedBy: profile?.full_name,
+
+    orientation: 'landscape' as const,
+
+  };
+
+
+
+  const handleExportInventoryExcel = () =>
+
+    exportToExcel({ ...inventoryExportBase, rows: buildInventoryExportRows() });
+
+  const handleExportInventoryPdf = () =>
+
+    exportToPdfReport({ ...inventoryExportBase, rows: buildInventoryExportRows() });
+
+
+
   const locationSummaries = useMemo(() => summarizeStockByLocation(balances), [balances]);
 
 
@@ -491,6 +575,20 @@ export function InventoryPage() {
         title="Inventory"
 
         description="Track stock by location, record movements, and monitor valuation."
+
+        action={
+
+          <ExportDropdown
+
+            onExportExcel={handleExportInventoryExcel}
+
+            onExportPdf={handleExportInventoryPdf}
+
+            disabled={activeTab !== 'overview' || filteredProductRows.length === 0}
+
+          />
+
+        }
 
       />
 

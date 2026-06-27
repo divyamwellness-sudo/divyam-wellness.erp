@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
 import { ProductForm, productCategoryOptions } from '@/features/products/components/ProductForm';
 import {
   getProducts,
@@ -165,6 +169,7 @@ function ProductTable({
 }
 
 export function ProductsPage() {
+  const { businessSettings, profile } = useAuth();
   const [formMode, setFormMode] = useState<ProductFormMode>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -253,6 +258,74 @@ export function ProductsPage() {
   const displayedProducts = searchTerm.length >= 2 ? searchResults || [] : productsData?.products || [];
   const isLoading = isLoadingProducts || isSearching;
   const isSearchActive = searchTerm.length >= 2;
+
+  // --- Export wiring (respects current search + filters) ---
+  // Shared row builder for both Excel and PDF. Null/empty prices render as "—".
+  const priceOrDash = (value: number | null | undefined): string | number =>
+    value == null ? '—' : Number(value);
+
+  const buildProductExportRows = (): ExportRow[] =>
+    displayedProducts.map((p) => ({
+      sku: p.sku,
+      name: p.name,
+      mrp: priceOrDash(p.mrp_price),
+      price15: priceOrDash(p.price_15),
+      price25: priceOrDash(p.price_25),
+      price35: priceOrDash(p.price_35),
+      price42: priceOrDash(p.price_42),
+      price50: priceOrDash(p.price_50),
+      volumePoints: priceOrDash(p.volume_points),
+    }));
+
+  // Excel: type-driven formatting/alignment; auto column widths.
+  const productExportColumns: ExportColumn[] = [
+    { key: 'sku', header: 'SKU', type: 'text' },
+    { key: 'name', header: 'Product', type: 'text' },
+    { key: 'mrp', header: 'MRP', type: 'currency' },
+    { key: 'price15', header: '15%', type: 'currency' },
+    { key: 'price25', header: '25%', type: 'currency' },
+    { key: 'price35', header: '35%', type: 'currency' },
+    { key: 'price42', header: '42%', type: 'currency' },
+    { key: 'price50', header: '50%', type: 'currency' },
+    { key: 'volumePoints', header: 'VP', type: 'number' },
+  ];
+
+  // PDF: explicit mm widths so all 9 columns fit A4 landscape on one page,
+  // product left-aligned, prices + VP centered. 8pt font keeps prices on one line.
+  const productPdfColumns: ExportColumn[] = [
+    { key: 'sku', header: 'SKU', type: 'text', align: 'left', width: 24 },
+    { key: 'name', header: 'Product', type: 'text', align: 'left', width: 66 },
+    { key: 'mrp', header: 'MRP', type: 'currency', align: 'center', width: 24 },
+    { key: 'price15', header: '15%', type: 'currency', align: 'center', width: 22 },
+    { key: 'price25', header: '25%', type: 'currency', align: 'center', width: 22 },
+    { key: 'price35', header: '35%', type: 'currency', align: 'center', width: 22 },
+    { key: 'price42', header: '42%', type: 'currency', align: 'center', width: 22 },
+    { key: 'price50', header: '50%', type: 'currency', align: 'center', width: 22 },
+    { key: 'volumePoints', header: 'VP', type: 'number', align: 'center', width: 18 },
+  ];
+
+  const productExportBase = {
+    title: 'Products Report',
+    worksheetName: 'Products',
+    filename: `products-${new Date().toISOString().slice(0, 10)}`,
+    businessSettings,
+    generatedBy: profile?.full_name,
+  };
+
+  const handleExportProductsExcel = () =>
+    exportToExcel({
+      ...productExportBase,
+      columns: productExportColumns,
+      rows: buildProductExportRows(),
+    });
+  const handleExportProductsPdf = () =>
+    exportToPdfReport({
+      ...productExportBase,
+      columns: productPdfColumns,
+      rows: buildProductExportRows(),
+      orientation: 'landscape',
+      tableFontSize: 8,
+    });
   const listError = isSearchActive ? searchError : productsError;
   const refetchList = isSearchActive ? refetchSearch : refetchProducts;
 
@@ -294,10 +367,17 @@ export function ProductsPage() {
         title="Products"
         description="Manage your product catalog and tier-based pricing."
         action={
-          <Button onClick={() => setFormMode('create')}>
-            <Plus className="h-4 w-4" />
+          <div className="flex flex-wrap gap-2">
+            <ExportDropdown
+              onExportExcel={handleExportProductsExcel}
+              onExportPdf={handleExportProductsPdf}
+              disabled={displayedProducts.length === 0}
+            />
+            <Button onClick={() => setFormMode('create')}>
+              <Plus className="h-4 w-4" />
             Add Product
           </Button>
+          </div>
         }
       />
 

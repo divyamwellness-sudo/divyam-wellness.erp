@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { exportToCsv } from '@/lib/utils/export';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
 import {
   getDefaultReportDateRange,
   ReportDateFilter,
@@ -103,6 +105,7 @@ function SummaryStrip({ items }: { items: Array<{ label: string; value: string }
 
 export function ReportsPage() {
   const navigate = useNavigate();
+  const { businessSettings, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<ReportType>('sales');
   const [dateRange, setDateRange] = useState(getDefaultReportDateRange);
 
@@ -247,95 +250,139 @@ export function ReportsPage() {
     setDateRange((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleExport = () => {
-    const filename = `${activeTab}-report-${dateRange.dateFrom}-to-${dateRange.dateTo}.csv`;
-
+  // --- Export wiring (respects active tab + current date range; exports
+  // exactly the rows currently rendered in the report table) ---
+  const reportExportConfig = useMemo<{
+    title: string;
+    worksheetName: string;
+    columns: ExportColumn[];
+    rows: ExportRow[];
+    orientation?: 'portrait' | 'landscape';
+  } | null>(() => {
     if (activeTab === 'sales' && salesQuery.data) {
-      exportToCsv(
-        salesQuery.data.rows.map((row) => ({
+      return {
+        title: 'Sales Report',
+        worksheetName: 'Sales',
+        orientation: 'landscape',
+        columns: [
+          { key: 'date', header: 'Date', type: 'date' },
+          { key: 'invoiceNumber', header: 'Invoice Number', type: 'text' },
+          { key: 'customer', header: 'Customer', type: 'text' },
+          { key: 'totalAmount', header: 'Total Amount', type: 'currency' },
+          { key: 'status', header: 'Status', type: 'text' },
+        ],
+        rows: salesQuery.data.rows.map((row) => ({
           date: formatDate(row.date),
           invoiceNumber: row.invoiceNumber,
           customer: row.customer,
-          totalAmount: row.totalAmount,
+          totalAmount: Number(row.totalAmount),
           status: statusLabels[row.status],
         })),
-        [
-          { key: 'date', header: 'Date' },
-          { key: 'invoiceNumber', header: 'Invoice Number' },
-          { key: 'customer', header: 'Customer' },
-          { key: 'totalAmount', header: 'Total Amount' },
-          { key: 'status', header: 'Status' },
-        ],
-        filename,
-      );
-      return;
+      };
     }
-
     if (activeTab === 'due' && dueQuery.data) {
-      exportToCsv(
-        dueQuery.data.rows.map((row) => ({
+      return {
+        title: 'Outstanding Due Report',
+        worksheetName: 'Due',
+        orientation: 'landscape',
+        columns: [
+          { key: 'customer', header: 'Customer', type: 'text' },
+          { key: 'phone', header: 'Phone', type: 'text' },
+          { key: 'invoiceNumber', header: 'Invoice Number', type: 'text' },
+          { key: 'dueAmount', header: 'Due Amount', type: 'currency' },
+          { key: 'invoiceDate', header: 'Invoice Date', type: 'date' },
+          { key: 'daysOutstanding', header: 'Days Outstanding', type: 'number' },
+        ],
+        rows: dueQuery.data.rows.map((row) => ({
           customer: row.customer,
-          customerPhone: row.customerPhone,
+          phone: row.customerPhone,
           invoiceNumber: row.invoiceNumber,
-          dueAmount: row.dueAmount,
+          dueAmount: Number(row.dueAmount),
           invoiceDate: formatDate(row.invoiceDate),
           daysOutstanding: row.daysOutstanding,
         })),
-        [
-          { key: 'customer', header: 'Customer' },
-          { key: 'customerPhone', header: 'Phone' },
-          { key: 'invoiceNumber', header: 'Invoice Number' },
-          { key: 'dueAmount', header: 'Due Amount' },
-          { key: 'invoiceDate', header: 'Invoice Date' },
-          { key: 'daysOutstanding', header: 'Days Outstanding' },
-        ],
-        filename,
-      );
-      return;
+      };
     }
-
     if (activeTab === 'payments' && paymentsQuery.data) {
-      exportToCsv(
-        paymentsQuery.data.rows.map((row) => ({
+      return {
+        title: 'Payments Report',
+        worksheetName: 'Payments',
+        columns: [
+          { key: 'date', header: 'Date', type: 'date' },
+          { key: 'invoiceNumber', header: 'Invoice Number', type: 'text' },
+          { key: 'method', header: 'Payment Method', type: 'text' },
+          { key: 'amount', header: 'Amount', type: 'currency' },
+          { key: 'reference', header: 'Reference', type: 'text' },
+        ],
+        rows: paymentsQuery.data.rows.map((row) => ({
           date: formatDate(row.date),
           invoiceNumber: row.invoiceNumber,
-          paymentMethod: paymentMethodLabels[row.paymentMethod] ?? row.paymentMethod,
-          amount: row.amount,
+          method: paymentMethodLabels[row.paymentMethod] ?? row.paymentMethod,
+          amount: Number(row.amount),
           reference: row.reference,
         })),
-        [
-          { key: 'date', header: 'Date' },
-          { key: 'invoiceNumber', header: 'Invoice Number' },
-          { key: 'paymentMethod', header: 'Payment Method' },
-          { key: 'amount', header: 'Amount' },
-          { key: 'reference', header: 'Reference' },
-        ],
-        filename,
-      );
-      return;
+      };
     }
-
     if (activeTab === 'customers' && customersQuery.data) {
-      exportToCsv(
-        customersQuery.data.rows.map((row) => ({
+      return {
+        title: 'Customer Activity Report',
+        worksheetName: 'Customers',
+        orientation: 'landscape',
+        columns: [
+          { key: 'customerName', header: 'Customer Name', type: 'text' },
+          { key: 'type', header: 'Type', type: 'text' },
+          { key: 'currentWeight', header: 'Current Weight (kg)', type: 'number' },
+          { key: 'totalInvoices', header: 'Total Invoices', type: 'number' },
+          { key: 'totalSpend', header: 'Total Spend', type: 'currency' },
+          { key: 'totalVp', header: 'Total VP', type: 'number' },
+        ],
+        rows: customersQuery.data.rows.map((row) => ({
           customerName: row.customerName,
-          customerType: row.customerType === 'coach' ? 'Coach' : 'PC',
+          type: row.customerType === 'coach' ? 'Coach' : 'PC',
           currentWeight: row.currentWeight ?? '',
           totalInvoices: row.totalInvoices,
-          totalSpend: row.totalSpend,
-          totalVp: row.totalVp,
+          totalSpend: Number(row.totalSpend),
+          totalVp: Number(row.totalVp),
         })),
-        [
-          { key: 'customerName', header: 'Customer Name' },
-          { key: 'customerType', header: 'Type' },
-          { key: 'currentWeight', header: 'Current Weight (kg)' },
-          { key: 'totalInvoices', header: 'Total Invoices' },
-          { key: 'totalSpend', header: 'Total Spend' },
-          { key: 'totalVp', header: 'Total VP' },
-        ],
-        filename,
-      );
+      };
     }
+    return null;
+  }, [
+    activeTab,
+    dateRange,
+    salesQuery.data,
+    dueQuery.data,
+    paymentsQuery.data,
+    customersQuery.data,
+  ]);
+
+  const handleExportReportExcel = () => {
+    if (!reportExportConfig) return;
+    void exportToExcel({
+      title: reportExportConfig.title,
+      worksheetName: reportExportConfig.worksheetName,
+      filename: `${activeTab}-report-${dateRange.dateFrom}-to-${dateRange.dateTo}`,
+      columns: reportExportConfig.columns,
+      rows: reportExportConfig.rows,
+      businessSettings,
+      generatedBy: profile?.full_name,
+      orientation: reportExportConfig.orientation,
+    });
+  };
+
+  const handleExportReportPdf = () => {
+    if (!reportExportConfig) return;
+    void exportToPdfReport({
+      title: reportExportConfig.title,
+      subtitle: `Period: ${formatDate(dateRange.dateFrom)} – ${formatDate(dateRange.dateTo)}`,
+      worksheetName: reportExportConfig.worksheetName,
+      filename: `${activeTab}-report-${dateRange.dateFrom}-to-${dateRange.dateTo}`,
+      columns: reportExportConfig.columns,
+      rows: reportExportConfig.rows,
+      businessSettings,
+      generatedBy: profile?.full_name,
+      orientation: reportExportConfig.orientation,
+    });
   };
 
   const getActiveRowCount = (): number => {
@@ -353,10 +400,11 @@ export function ReportsPage() {
         title="Reports"
         description="Sales, payments, outstanding dues, and customer activity."
         action={
-          <Button variant="secondary" onClick={handleExport} disabled={exportDisabled}>
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          <ExportDropdown
+            onExportExcel={handleExportReportExcel}
+            onExportPdf={handleExportReportPdf}
+            disabled={exportDisabled}
+          />
         }
       />
 

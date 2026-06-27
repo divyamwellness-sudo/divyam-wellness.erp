@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Search,
   Filter,
-  Download,
   Plus,
   CreditCard,
   IndianRupee,
@@ -15,6 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { QueryErrorAlert } from '@/components/shared/QueryErrorAlert';
+import { ExportDropdown } from '@/components/shared/ExportDropdown';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { RecordPaymentModal } from '@/features/billing/components/RecordPaymentModal';
 import {
   getPaymentLedger,
@@ -22,7 +23,8 @@ import {
 } from '@/features/billing/services/payment.service';
 import { getInvoices } from '@/features/billing/services/invoice.service';
 import { getCustomers } from '@/features/customers/services/customer.service';
-import { exportToCsv } from '@/lib/utils/export';
+import { exportToExcel, exportToPdfReport } from '@/lib/export';
+import type { ExportColumn, ExportRow } from '@/lib/export';
 import { formatCurrency } from '@/lib/utils/currency';
 import { formatDate, toLocalDateInputValue, startOfLocalMonthInputValue } from '@/lib/utils/format';
 import type { PaymentMethod } from '@/types/database.types';
@@ -235,6 +237,7 @@ function PaymentTable({
 
 export function PaymentsPage() {
   const navigate = useNavigate();
+  const { businessSettings, profile } = useAuth();
 
   const [filters, setFilters] = useState<PaymentLedgerFilters>({
     search: '',
@@ -346,35 +349,42 @@ export function PaymentsPage() {
     }
   };
 
-  const handleExportCsv = () => {
+  // --- Export wiring (active payments only; reversed payments are excluded
+  // by getPaymentLedger). Respects current search, filters, and date range. ---
+  const paymentExportColumns: ExportColumn[] = [
+    { key: 'date', header: 'Date', type: 'date' },
+    { key: 'customer', header: 'Customer', type: 'text' },
+    { key: 'invoice', header: 'Invoice', type: 'text' },
+    { key: 'method', header: 'Method', type: 'text' },
+    { key: 'amount', header: 'Amount', type: 'currency' },
+  ];
+
+  const buildPaymentExportRows = (): ExportRow[] =>
+    payments.map((p) => ({
+      date: formatDate(p.payment_date),
+      customer: p.customer_name,
+      invoice: p.invoice_number,
+      method: paymentMethodLabels[p.payment_method] ?? p.payment_method,
+      amount: Number(p.amount),
+    }));
+
+  const paymentExportBase = {
+    title: 'Payments Ledger',
+    worksheetName: 'Payments',
+    filename: `payments-ledger-${toLocalDateInputValue()}`,
+    columns: paymentExportColumns,
+    businessSettings,
+    generatedBy: profile?.full_name,
+  };
+
+  const handleExportPaymentsExcel = () => {
     if (payments.length === 0) return;
-    exportToCsv(
-      payments.map((p) => ({
-        payment_date: p.payment_date,
-        customer_name: p.customer_name,
-        customer_phone: p.customer_phone,
-        invoice_number: p.invoice_number,
-        invoice_status: p.invoice_status,
-        payment_method: p.payment_method,
-        amount: p.amount,
-        reference_num: p.reference_num ?? '',
-        invoice_total: p.invoice_total,
-        invoice_due: p.invoice_due,
-      })),
-      [
-        { key: 'payment_date', header: 'Payment Date' },
-        { key: 'customer_name', header: 'Customer Name' },
-        { key: 'customer_phone', header: 'Customer Phone' },
-        { key: 'invoice_number', header: 'Invoice Number' },
-        { key: 'invoice_status', header: 'Invoice Status' },
-        { key: 'payment_method', header: 'Payment Method' },
-        { key: 'amount', header: 'Amount' },
-        { key: 'reference_num', header: 'Reference Number' },
-        { key: 'invoice_total', header: 'Invoice Total' },
-        { key: 'invoice_due', header: 'Outstanding Due' },
-      ],
-      `payments-ledger-${toLocalDateInputValue()}.csv`,
-    );
+    void exportToExcel({ ...paymentExportBase, rows: buildPaymentExportRows() });
+  };
+
+  const handleExportPaymentsPdf = () => {
+    if (payments.length === 0) return;
+    void exportToPdfReport({ ...paymentExportBase, rows: buildPaymentExportRows() });
   };
 
   return (
@@ -384,14 +394,11 @@ export function PaymentsPage() {
         description="A live ledger of payments collected across all invoices."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleExportCsv}
+            <ExportDropdown
+              onExportExcel={handleExportPaymentsExcel}
+              onExportPdf={handleExportPaymentsPdf}
               disabled={payments.length === 0}
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
+            />
             <Button onClick={() => setIsRecordModalOpen(true)}>
               <Plus className="h-4 w-4" />
               Record Payment
